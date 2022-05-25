@@ -1,0 +1,68 @@
+//
+// !!! WARNING !!! AUTO-GENERATED FILE!
+// PLEASE DO NOT MODIFY IT AND USE "platformio.ini":
+// https://docs.platformio.org/page/projectconf/section_env_build.html#build-flags
+//
+{
+    "configurations": [
+        {
+            "name": "PlatformIO",
+            "includePath": [
+                "c:/Users/sct/Documents/PlatformIO/Projects/220524-151157-itsybitsy32u4_3V/include",
+                "c:/Users/sct/Documents/PlatformIO/Projects/220524-151157-itsybitsy32u4_3V/src",
+                "C:/Users/sct/Documents/Arduino/libraries/ODriveArduino",
+                "C:/Users/sct/Documents/Arduino/libraries/Adafruit_SSD1306",
+                "C:/Users/sct/Documents/Arduino/libraries/Adafruit_GFX_Library",
+                "C:/Users/sct/Documents/Arduino/libraries/Adafruit_BusIO",
+                "C:/Users/sct/.platformio/packages/framework-arduino-avr/libraries/SPI/src",
+                "C:/Users/sct/.platformio/packages/framework-arduino-avr/libraries/Wire/src",
+                "C:/Users/sct/.platformio/packages/framework-arduino-avr/cores/arduino",
+                "C:/Users/sct/.platformio/packages/framework-arduino-avr/variants/itsybitsy32u4",
+                "C:/Users/sct/.platformio/packages/framework-arduino-avr/libraries/EEPROM/src",
+                "C:/Users/sct/.platformio/packages/framework-arduino-avr/libraries/HID/src",
+                "C:/Users/sct/.platformio/packages/framework-arduino-avr/libraries/SoftwareSerial/src",
+                ""
+            ],
+            "browse": {
+                "limitSymbolsToIncludedHeaders": true,
+                "path": [
+                    "c:/Users/sct/Documents/PlatformIO/Projects/220524-151157-itsybitsy32u4_3V/include",
+                    "c:/Users/sct/Documents/PlatformIO/Projects/220524-151157-itsybitsy32u4_3V/src",
+                    "C:/Users/sct/Documents/Arduino/libraries/ODriveArduino",
+                    "C:/Users/sct/Documents/Arduino/libraries/Adafruit_SSD1306",
+                    "C:/Users/sct/Documents/Arduino/libraries/Adafruit_GFX_Library",
+                    "C:/Users/sct/Documents/Arduino/libraries/Adafruit_BusIO",
+                    "C:/Users/sct/.platformio/packages/framework-arduino-avr/libraries/SPI/src",
+                    "C:/Users/sct/.platformio/packages/framework-arduino-avr/libraries/Wire/src",
+                    "C:/Users/sct/.platformio/packages/framework-arduino-avr/cores/arduino",
+                    "C:/Users/sct/.platformio/packages/framework-arduino-avr/variants/itsybitsy32u4",
+                    "C:/Users/sct/.platformio/packages/framework-arduino-avr/libraries/EEPROM/src",
+                    "C:/Users/sct/.platformio/packages/framework-arduino-avr/libraries/HID/src",
+                    "C:/Users/sct/.platformio/packages/framework-arduino-avr/libraries/SoftwareSerial/src",
+                    ""
+                ]
+            },
+            "defines": [
+                "PLATFORMIO=60001",
+                "ARDUINO_AVR_ITSYBITSY32U4_3V",
+                "F_CPU=8000000L",
+                "ARDUINO_ARCH_AVR",
+                "ARDUINO=10808",
+                "USB_VID=0x239A",
+                "USB_PID=0x000E",
+                "USB_PRODUCT=\"ItsyBitsy 32u4 3V 8MHz\"",
+                "USB_MANUFACTURER=\"Adafruit\"",
+                "__AVR_ATmega32U4__",
+                ""
+            ],
+            "cStandard": "c11",
+            "cppStandard": "c++11",
+            "compilerPath": "C:/Users/sct/.platformio/packages/toolchain-atmelavr/bin/avr-gcc.exe",
+            "compilerArgs": [
+                "-mmcu=atmega32u4",
+                ""
+            ]
+        }
+    ],
+    "version": 4
+}
