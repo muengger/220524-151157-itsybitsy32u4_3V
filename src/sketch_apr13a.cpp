@@ -54,8 +54,6 @@ int TrottleSensorVal = 0; // gemessener Wert des Geschwindigkeitsreglers
 float Torque = 0; // Drehmoment
 float BusVoltage; // Spannung der Batterie
 
-bool DebugMode = false;
-
 // int WheelDiameter = 160; // Raddurchmesser in mm. Anhand Umdrehung könnte so das Tempo berechnet werden. // TODO via Konfig änderbar
 // float BatVoltageMax = 33 // Maximum Batteriespannung -> 100% geladen // TODO via Konfig änderbar
 // float BatVoltageWarn = 25 // unter dieser Spannung wird gewarnt // TODO via Konfig änderbar
@@ -218,13 +216,6 @@ void setup() {
   pinMode(PinButtonMiddle,INPUT_PULLUP);
 
   Serial.begin(9600);
-  if(digitalRead(PinButtonMiddle) == LOW) { // wenn der Mittlere Button gedrückt wird beim Start, so wird wartet der Controller bis USB eingesteckt und "Serial" initialisiert ist -> DEBUGinformationen können per Serial.print() ausgegeben werden
-    while (!Serial) {
-      ; // wait for serial port to connect. Needed for native USB port only
-    }
-    DebugMode = true;
-  }
-
   digitalWrite(PinHoldPower,HIGH);
   delay(200);
   display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS);
@@ -323,20 +314,18 @@ void ManagePowerSwitch(){
 }
 
 void waitButtonPress() {
-  if(DebugMode) { // only wait if DebugMode is activated
-    Serial.print("DEBUG\nWaiting left Button...");
-    do {
-      ButtonLeft.refresh();
-      if(ButtonLeft.onPress()) {
-        break;
-      } else {
-        delay(100);
-      }
+  Serial.print("DEBUG\nWaiting left Button...");
+  do {
+    ButtonLeft.refresh();
+    if(ButtonLeft.onPress()) {
+      break;
+    } else {
+      delay(100);
     }
-    while(true);
-    Serial.println("OK");
-    delay(100);
   }
+  while(true);
+  Serial.println("OK");
+  delay(100);
 }
    
 
@@ -404,13 +393,6 @@ void ModeOne() { // Driving
       x3 = 64 - x3tmp;
       y3 = 60 - y3tmp;
 
-      if(DebugMode) {
-        Serial.println("x3");
-        Serial.println(x3tmp);
-        Serial.println("y3");
-        Serial.println(y3tmp);
-      }
-        
       // draw new triangle
       display.fillTriangle(x1, y1, x2, y2, x3, y3, SSD1306_WHITE);
       display.display();
