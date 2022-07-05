@@ -100,6 +100,7 @@ void Driving();
 void ConfirmAge();
 
 void waitButtonPress();
+void showBattery();
 
 void serial_flush() ;
 
@@ -140,7 +141,7 @@ class Debug {
 };*/
 
 
-/*class ViewBattery {
+class ViewBattery {
   static uint16_t counter;
   static int lastStatus; // 0 to 100%
   static int criticalStatus; // values below this will provoque an alert!
@@ -152,9 +153,12 @@ class Debug {
   public:
     static void setStatus(int currentStatus) {
       if(currentStatus == lastStatus) {
-        return;
+        Serial.println("Still same Battery Status");
+        //display.startscrollleft(0x00,0x0F);
       } else {
-        display.fillRect(screenPosX+2,10,totalWidth-2,44,0); // fill battery with black
+        Serial.println("Status changed");
+        /*
+        display.fillRect(screenPosX+2,10,totalWidth-2,44,0);
         int bar;
         int barCount;
 
@@ -162,11 +166,11 @@ class Debug {
         barCount = (currentStatus+10)/20; // how many bars? 100%-90% = 5, 89%-70% = 4, 69% - 50% = 3, 49% - 30% = 2, 29% - 10% = 1, below 10% = 0;
         for(bar=0;bar<=barCount;bar++) {
           display.fillRect(screenPosX+2, 53-(bar*9), totalWidth-2, 8, SSD1306_WHITE); // draw rectancles of 8px height, move 9px to top
-        }
+        }*/
         lastStatus = currentStatus ;
       }
     };
-
+/*
     static void isEmpty() { // 
       if(lastStatus != 0) {
         setStatus(0);
@@ -182,25 +186,31 @@ class Debug {
       }
     }
 
-  private:
+  */
     static void showBattery() {
+      Serial.println("ShowBattery");
       drawBattery(false);
     };
-
-    static void hideBattery() {
-      drawBattery(true);
-    };
+  
+  private:
+    //static void hideBattery() {
+     // drawBattery(true);
+    //};
 
     static void drawBattery(bool drawMode) {
-      if(drawMode) {
-        display.drawRoundRect(screenPosX,8,totalWidth,46,2,drawMode); // draw Battery shape
-        display.fillRect(screenPosX,6,totalWidth/2,2,drawMode); // button at the top
-      }
+      Serial.println("Draw at X");
+      Serial.println(screenPosX);
+      Serial.println("widt");
+      Serial.println(totalWidth);
+      display.drawRoundRect(screenPosX,8,totalWidth,46,2,SSD1306_WHITE); // draw Battery shape
+      display.fillRect(screenPosX,6,totalWidth/2,2,SSD1306_WHITE); // button at the top
+      display.display();
     }
 };
 int ViewBattery::screenPosX = 102;
 int ViewBattery::totalWidth = 20;
-*/
+int ViewBattery::lastStatus = 0;
+
 
 
 void setup() {
@@ -320,7 +330,13 @@ void waitButtonPress() {
    
 
 void Driving() { // Driving
-  double _oldThrottleVal = ReadTrottleSensor();
+  UpdateBusVoltage();
+  ManagePowerSwitch();
+  waitButtonPress();
+  ViewBattery::showBattery();
+  waitButtonPress();
+  // ************** code needed for throttle gauge ******************* //
+  /*double _oldThrottleVal = ReadTrottleSensor();
   double _currentThrottleVal;
   double speedInPercent;
 
@@ -331,10 +347,7 @@ void Driving() { // Driving
   int16_t y2 = 60;
   int16_t x3, y3;
   double x3tmp, y3tmp;
-
-  UpdateBusVoltage();
-  ManagePowerSwitch();
-  
+*/
   do{
     if(digitalRead(PinButtonMiddle) == LOW) {
       Serial.println("ButtonMiddle was pressed - set Mode to ModeTwo");
@@ -343,7 +356,7 @@ void Driving() { // Driving
       break;
     }
 
-    _currentThrottleVal = ReadTrottleSensor();
+    /*_currentThrottleVal = ReadTrottleSensor();
     if(_currentThrottleVal == _oldThrottleVal) {
     } else {
       Serial.println("Speed changed");
@@ -370,29 +383,23 @@ void Driving() { // Driving
       double angle = 90 * speedInPercent;
       double bogenmass = (angle / 180)  * M_PI;
 
-      /*x3 = 64-(cos(bogenmass) * needleLengh);
-      y3 = 60-(sin(bogenmass) * needleLengh);*/
-
-      x3tmp = (cos(bogenmass) * needleLengh);
-      y3tmp = (sin(bogenmass) * needleLengh);
-
-      x3 = 64 - x3tmp;
-      y3 = 60 - y3tmp;
+      x3 = 64 - (cos(bogenmass) * needleLengh);
+      y3 = 60 - (sin(bogenmass) * needleLengh);
 
       // draw new triangle
       display.fillTriangle(x1, y1, x2, y2, x3, y3, SSD1306_WHITE);
       display.display();
 
       _oldThrottleVal = _currentThrottleVal;
-    }
+    }*/
 
+    ViewBattery::setStatus(50);
     UpdateTrottle();
   }
   while(true);
 }
 
 void ConfirmAge() { //Ask for Racer Confirmation
-  Serial.println("Now in ModeTwo.");
   switch(lastMode) { // Sobald dieser Teil ausgeführt wird, geht nix mehr
     case Mode::Driving:
       break;
