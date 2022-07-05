@@ -24,7 +24,7 @@
 
 #include <ButtonClass.h>
 
-enum class Mode { One, Two, Tree };
+enum class Mode { Driving, ConfirmAge, ManageSettings };
 // the setup function runs once when you press reset or power the board
 
 //PINS
@@ -46,8 +46,8 @@ Button ButtonLeft = Button(PinButtonLeft);
 Button ButtonMiddle = Button(PinButtonMiddle);
 
 // Global ENUMs
-Mode currentMode = Mode::One;
-Mode lastMode = Mode::One;
+Mode currentMode = Mode::Driving;
+Mode lastMode = Mode::Driving;
 
 // Global Variables
 int TrottleSensorVal = 0; // gemessener Wert des Geschwindigkeitsreglers
@@ -96,8 +96,8 @@ void UpdateBusVoltage();
 void ManagePowerSwitch();
 
 void CheckMode();
-void ModeOne();
-void ModeTwo();
+void Driving();
+void ConfirmAge();
 
 void waitButtonPress();
 
@@ -319,7 +319,7 @@ void waitButtonPress() {
 }
    
 
-void ModeOne() { // Driving
+void Driving() { // Driving
   double _oldThrottleVal = ReadTrottleSensor();
   double _currentThrottleVal;
   double speedInPercent;
@@ -338,8 +338,8 @@ void ModeOne() { // Driving
   do{
     if(digitalRead(PinButtonMiddle) == LOW) {
       Serial.println("ButtonMiddle was pressed - set Mode to ModeTwo");
-      lastMode = Mode::One;
-      currentMode = Mode::Two;
+      lastMode = Mode::Driving;
+      currentMode = Mode::ConfirmAge;
       break;
     }
 
@@ -391,14 +391,14 @@ void ModeOne() { // Driving
   while(true);
 }
 
-void ModeTwo(Mode selectedMode) { //Ask for Racer Confirmation
+void ConfirmAge() { //Ask for Racer Confirmation
   Serial.println("Now in ModeTwo.");
   switch(lastMode) { // Sobald dieser Teil ausgeführt wird, geht nix mehr
-    case Mode::One:
+    case Mode::Driving:
       break;
-    case Mode::Two:
+    case Mode::ConfirmAge:
       break;
-    case Mode::Tree:
+    case Mode::ManageSettings:
       break;
     default:
       break;
@@ -492,8 +492,8 @@ void ModeTwo(Mode selectedMode) { //Ask for Racer Confirmation
   do{
     if(digitalRead(PinButtonMiddle) == LOW) {
       Serial.println("ButtonMiddle was pressed - set Mode to ModeTree");
-      lastMode = Mode::Two;
-      currentMode = Mode::Tree;
+      lastMode = Mode::ConfirmAge;
+      currentMode = Mode::ManageSettings;
       break;
     }
     delay(1000);
@@ -501,13 +501,13 @@ void ModeTwo(Mode selectedMode) { //Ask for Racer Confirmation
   while(true);
 }
 
-void ModeTree() {
+void ManageSettings() {
  switch(lastMode) { // Sobald dieser Teil ausgeführt wird, geht nix mehr
-    case Mode::One:
+    case Mode::Driving:
       break;
-    case Mode::Two:
+    case Mode::ConfirmAge:
       break;
-    case Mode::Tree:
+    case Mode::ManageSettings:
       break;
     default:
       break;
@@ -516,9 +516,9 @@ void ModeTree() {
   do{
     Serial.println("Check Button Middle");
     if(digitalRead(PinButtonMiddle) == LOW) {
-      Serial.println("ButtonMiddle was pressed - set Mode to ModeOne");
-      lastMode = Mode::Tree;
-      currentMode = Mode::One;
+      Serial.println("ButtonMiddle was pressed - set Mode to Driving");
+      lastMode = Mode::ManageSettings;
+      currentMode = Mode::Driving;
       break;
     }
     delay(1000);
@@ -532,17 +532,14 @@ void ModeTree() {
 
 void CheckMode(){
   switch(currentMode) {
-    case Mode::One:
-      ModeOne();
+    case Mode::Driving:
+      Driving();
       break;
-    case Mode::Two:
-      ModeTwo(currentMode);
+    case Mode::ConfirmAge:
+      ConfirmAge();
       break;
-    case Mode::Tree:
-      ModeTree();
+    case Mode::ManageSettings:
+      ManageSettings();
       break;
-    default:
-      Serial.println("Unknown Case handled");
   };
-  waitButtonPress();
 }
