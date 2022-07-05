@@ -1,3 +1,11 @@
+// TODO DisplayLayoutManager -> Title, Content, Footer, Tooltip (PopUp). Zu nutzen für fixe Hintergründe (templates)
+// TODO aus DisplayLayoutManager -> SaveScreen / Restore Screen
+// TODO InteractionManager -> welche Buttons stehen an dieser Stelle zur Verfügung? Welche Aktionen lösen diese aus? -> wird dies genutzt, befindet sich der Script in einem Loop (Fahren muss angehalten sein), damit nur diese Werte abgefangen werden können.
+// TODO TextInput (aus InteractionManager) -> string einlesen, mit HOCH und RUNTER um Buchstaben zu wählen oder in der 2. Version sogar einem eigenblendetem Alphabet (A-Z1-0 welches durchgescrollt werden kann), muss auch den Screen vor Anzeige eines interaktiven Elements speichern. Sobald Wert ausgelesen und  zurückgegeben, kann der ursprüngliche Screen wiederhergestellt werden
+// TODO ValueInput (aus InteractionManager) -> siehe TextInput
+// TODO DynamicValue Class -> nur innert eines gleichen loops verwendbar. Muss vorher instantiert werden. Merkt sich die CursorPosition, akzeptiert einen (Initial)Wert zur Ausgabe. Speichert den Wert und sobald ein neuer kommt, wird erst anhand Position und altem Wert, der alte überschrieben und der neue geschrieben
+// TODO ASCI Symbole zu finden unter https://forums.adafruit.com/viewtopic.php?f=8&t=51999
+
 #include <SPI.h>
 #include <Wire.h>
 #include <Adafruit_GFX.h>
@@ -14,36 +22,58 @@
 
 #include <HardwareSerial.h>
 
+#include <ButtonClass.h>
+
+enum class Mode { One, Two, Tree };
 // the setup function runs once when you press reset or power the board
 
 //PINS
-int PinTrottleSensor = 27; //D9,A9
+int PinTrottleSensor = 27; //D9,A9 //Poti für Geschwindigkeit
 int PinODRVSerialRX = 0;
 int PinODRVSerialTX = 1;
 int PinLed = 13;
-int PinButtonUp = 23;
-int PinButtonDown = 14;
-int PinButtonRight = 15;
-int PinButtonLeft = 16;
-int PinButtonMidle = 22;
-int PinButtonOn = 11;
+int PinButtonUp = 23; // Button OBEN
+int PinButtonDown = 14; // Button UNTEN
+int PinButtonRight = 15; // Button  RECHTS
+int PinButtonLeft = 16; // Button LINKS
+int PinButtonMiddle = 22; // Button Mitte
+int PinButtonOn = 11; // Button ON ??? ganz unten???
 int PinHoldPower = 10;
 int PinI2CSCL = 3;
 int PinI2CSDA = 2;
 
+Button ButtonLeft = Button(PinButtonLeft);
+Button ButtonMiddle = Button(PinButtonMiddle);
 
-int TrottleSensorVal = 0;
-float Torque = 0;
-float BusVoltage;
+// Global ENUMs
+Mode currentMode = Mode::One;
+Mode lastMode = Mode::One;
 
-#define MAXSENSORVAL 955
-#define MINSENSORVAL 0
-#define MIDDLESENSORVAL 340
+// Global Variables
+int TrottleSensorVal = 0; // gemessener Wert des Geschwindigkeitsreglers
+float Torque = 0; // Drehmoment
+float BusVoltage; // Spannung der Batterie
+
+bool DebugMode = false;
+
+// int WheelDiameter = 160; // Raddurchmesser in mm. Anhand Umdrehung könnte so das Tempo berechnet werden. // TODO via Konfig änderbar
+// float BatVoltageMax = 33 // Maximum Batteriespannung -> 100% geladen // TODO via Konfig änderbar
+// float BatVoltageWarn = 25 // unter dieser Spannung wird gewarnt // TODO via Konfig änderbar
+// float BatVoltageMin = 23 // Minimale Batteriespannung -> 0 % -> muss abstellen // TODO via Konfig änderbar
+
+// int ThrottleMax = 955; // Maximaler Wert für Temposensor -> volles Tempo vorwärts // TODO via Konfi änderbar
+// int ThrottleStop = 340; // Temposensorwert für Stillstand // TODO via Konfi änderbar
+// int ThrottleMin = 0; // Maximaler Wert für Temposensor -> volles Tempor rückwärts // TODO via Konfi änderbar
+
+// int MaxKMHForward = 20; // Anhand Durchmesser und Umdrehungen / Sekunde berechnete Maximalgeschwindigkeit vorwärts // TODO via Konfi änderbar
+// int MaxKMHBackward = 5; // Anhand Durchmesser und Umdrehungen / Sekunde berechnete Maximalgeschwindigkeit rückwärts // TODO via Konfi änderbar
+
+
+#define MAXSENSORVAL 955 // Maximalwert des Geschwindigkeitsreglers
+#define MINSENSORVAL 0 // Minimalwert des Geschwindigkeitsreglers
+#define MIDDLESENSORVAL 340 // Mittelwert des Geschwindigkeitsreglers. Alles darüber ist vorwärts fahren, alles darunter ist rückwärts fahren
 #define HYSTSENSORVAL 10
-#define MAXTORQUE 3
-
-
-
+#define MAXTORQUE 3 // maximaler Drehmoment
 
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
 #define SCREEN_HEIGHT 64 // OLED display height, in pixels
@@ -61,11 +91,119 @@ template<class T> inline Print& operator <<(Print &obj,     T arg) { obj.print(a
 template<>        inline Print& operator <<(Print &obj, float arg) { obj.print(arg, 4); return obj; }
 
 int SerialRead(char *Buff,int Size );
+
+int ReadTrottleSensor();
 void UpdateTrottle();
 void UpdateBusVoltage();
 void ManagePowerSwitch();
-void ManageDisplay();
+
+void CheckMode();
+void ModeOne();
+void ModeTwo();
+
+void waitButtonPress();
+
 void serial_flush() ;
+
+/*
+class Debug {
+
+  void SerialOutput(String text) {
+    //
+  }
+
+  void WaitButtonPress(Button selectedButton) {
+    //
+  }
+};
+*/
+
+/* class CustomSetting { 
+  public:
+    String _Description;
+    int _inputValue;
+    double _factorBasic;
+    
+  public:
+    void CustomSetting(int bindedVariable, String settingDescription, double factor) {
+      _Description = settingDescription;
+      _inputValue = bindedVariable;
+    }
+
+    void IncTrigger(int multiplicator) {
+      _inputValue = _inputValue+(factor*multiplicator)
+      // TODO: check, dass maximalwert nicht überschritten wird
+    }
+
+    void DecTrigger() {
+      _inputValue = _inputValue - (factor*multiplicator)
+      // TODO: check, dass minimalwert nicht unterschritten wird
+    }
+};*/
+
+
+/*class ViewBattery {
+  static uint16_t counter;
+  static int lastStatus; // 0 to 100%
+  static int criticalStatus; // values below this will provoque an alert!
+
+  public:
+    static int screenPosX;
+    static int totalWidth;
+
+  public:
+    static void setStatus(int currentStatus) {
+      if(currentStatus == lastStatus) {
+        return;
+      } else {
+        display.fillRect(screenPosX+2,10,totalWidth-2,44,0); // fill battery with black
+        int bar;
+        int barCount;
+
+        //barCount=(currentStatus+19)/20; // how many bars? 100%-81% = 5, 80%-61% = 4, 60% - 41% = 3, 40% - 21% = 2, 20% - 1% = 1, below 0% = 0;
+        barCount = (currentStatus+10)/20; // how many bars? 100%-90% = 5, 89%-70% = 4, 69% - 50% = 3, 49% - 30% = 2, 29% - 10% = 1, below 10% = 0;
+        for(bar=0;bar<=barCount;bar++) {
+          display.fillRect(screenPosX+2, 53-(bar*9), totalWidth-2, 8, SSD1306_WHITE); // draw rectancles of 8px height, move 9px to top
+        }
+        lastStatus = currentStatus ;
+      }
+    };
+
+    static void isEmpty() { // 
+      if(lastStatus != 0) {
+        setStatus(0);
+      }
+      if(counter==200) { // falls 200 erreicht, ausblenden
+        hideBattery();
+        counter = 0; // zähler zurücksetzen
+      } else {
+        if(counter==100) { // falls 100 erreicht, einblenden
+          showBattery();
+        } 
+        counter++; // und weiter hochzählen
+      }
+    }
+
+  private:
+    static void showBattery() {
+      drawBattery(false);
+    };
+
+    static void hideBattery() {
+      drawBattery(true);
+    };
+
+    static void drawBattery(bool drawMode) {
+      if(drawMode) {
+        display.drawRoundRect(screenPosX,8,totalWidth,46,2,drawMode); // draw Battery shape
+        display.fillRect(screenPosX,6,totalWidth/2,2,drawMode); // button at the top
+      }
+    }
+};
+int ViewBattery::screenPosX = 102;
+int ViewBattery::totalWidth = 20;
+*/
+
 
 void setup() {
   int motornum = 0;
@@ -77,7 +215,15 @@ void setup() {
   pinMode(PinButtonDown,INPUT_PULLUP);
   pinMode(PinButtonRight,INPUT_PULLUP);
   pinMode(PinButtonLeft,INPUT_PULLUP);
-  pinMode(PinButtonMidle,INPUT_PULLUP);
+  pinMode(PinButtonMiddle,INPUT_PULLUP);
+
+  Serial.begin(9600);
+  if(digitalRead(PinButtonMiddle) == LOW) { // wenn der Mittlere Button gedrückt wird beim Start, so wird wartet der Controller bis USB eingesteckt und "Serial" initialisiert ist -> DEBUGinformationen können per Serial.print() ausgegeben werden
+    while (!Serial) {
+      ; // wait for serial port to connect. Needed for native USB port only
+    }
+    DebugMode = true;
+  }
 
   digitalWrite(PinHoldPower,HIGH);
   delay(200);
@@ -88,37 +234,34 @@ void setup() {
   display.setTextColor(SSD1306_WHITE); // Draw white text
   display.setCursor(0, 0);     // Start at top-left corner
   display.cp437(true);         // Use full 256 char 'Code Page 437' font
-  display.print("High\nim the Roller Chair\nTurbo Controller");
+  display.print("High\nin the Roller Chair\nTurbo Controller");
   display.display();
-  delay(2000);
+  delay(1500);
 
   odrive_serial.begin(57600);
   Serial1.setTimeout(4);
   requested_state = AXIS_STATE_CLOSED_LOOP_CONTROL;
-  odrive.run_state(motornum, requested_state, false /*don't wait*/);
-  
+  //odrive.runState(motornum, requested_state, false /*don't wait*/); // comment as long drive is not connected!
+  display.clearDisplay();
+  display.display();
 }
 
-// the loop function runs over and over again forever
 void loop() {
+  Serial.println("We are in the main loop");
   static uint8_t toggle=0;
   static unsigned long timeOld = 0;
   unsigned long timeNew = millis();
-  if((timeOld+100) < timeNew){ //Run with 10Hz
+  if((timeOld+100) < timeNew){ //Run with 10Hz // TODO move this value to a global variable, so every loop can use this value... e.g. the Battery-Object which start to BLINK every 1sec if voltage is near to critical value
+    Serial.println("loop: inside if");
     timeOld = timeNew;
     
-    UpdateBusVoltage();
-    ManagePowerSwitch();
-    ManageDisplay();
-
-    UpdateTrottle();
+    CheckMode();
+  
     digitalWrite(PinLed,toggle);
     toggle ^= 1;
-    
+  } else {
+    Serial.println("loop: inside else");
   }
-
-
-  
 }
 
 int SerialRead(String * Buff,int Size ){
@@ -131,8 +274,15 @@ void serial_flush() {
   while (Serial1.available()) Serial1.read();
 }
 
-void UpdateTrottle(){
-  TrottleSensorVal = analogRead(PinTrottleSensor);
+int ReadTrottleSensor() {
+  int _TrottleSensorVal;
+  //Serial.println("Read ThrottleSens");
+  _TrottleSensorVal = analogRead(PinTrottleSensor);
+  TrottleSensorVal = _TrottleSensorVal;
+  return _TrottleSensorVal;
+}
+
+void UpdateTrottle(){ // TODO Umbauen. Soll einen % Wert vom Maximal möglichen Speed vor- oder rückwärts als Parameter erhalten
   float temp = TrottleSensorVal;
   Torque =0;
   if(TrottleSensorVal > MIDDLESENSORVAL + HYSTSENSORVAL){
@@ -145,9 +295,11 @@ void UpdateTrottle(){
   command += "\n";
   Serial1.write(command.c_str());
 }
+// TODO neue Funktion für das Auslesen des Wertes. 
 
 
 void UpdateBusVoltage(){
+  //Serial.println("Updating Bus Voltage");
   String Buffer;
 
   serial_flush();
@@ -157,6 +309,7 @@ void UpdateBusVoltage(){
 }
 
 void ManagePowerSwitch(){
+  //Serial.println("Managing Power Switch");
   static uint32_t counter = 0;
   if(digitalRead(PinButtonOn)==1){
     counter++;
@@ -167,19 +320,291 @@ void ManagePowerSwitch(){
   if(counter > 30){
     digitalWrite(PinHoldPower,0);
   }
+}
+
+void waitButtonPress() {
+  if(DebugMode) { // only wait if DebugMode is activated
+    Serial.print("DEBUG\nWaiting left Button...");
+    do {
+      ButtonLeft.refresh();
+      if(ButtonLeft.onPress()) {
+        break;
+      } else {
+        delay(100);
+      }
+    }
+    while(true);
+    Serial.println("OK");
+    delay(100);
+  }
+}
+   
+
+void ModeOne() { // Driving
+  double _oldThrottleVal = ReadTrottleSensor();
+  double _currentThrottleVal;
+  double speedInPercent;
+
+  double needleLengh = 40; // aka Radius aka Hypothenuse
+  int16_t x1 = 64-4;
+  int16_t y1 = 60;
+  int16_t x2 = 64+4;
+  int16_t y2 = 60;
+  int16_t x3, y3;
+  double x3tmp, y3tmp;
+
+  Serial.println("Now in ModeOne.");
+
+  UpdateBusVoltage();
+  ManagePowerSwitch();
+  
+  do{
+    //Serial.println("Check Button Middle");
+    if(digitalRead(PinButtonMiddle) == LOW) {
+      Serial.println("ButtonMiddle was pressed - set Mode to ModeTwo");
+      lastMode = Mode::One;
+      currentMode = Mode::Two;
+      break;
+    }
+
+    _currentThrottleVal = ReadTrottleSensor();
+    if(_currentThrottleVal == _oldThrottleVal) {
+      //Serial.println("Not changed speed");
+    } else {
+      Serial.println("Speed changed");
+      if(_currentThrottleVal>MIDDLESENSORVAL) {
+        // forwärts fahren
+      } else {
+        if(_currentThrottleVal<MIDDLESENSORVAL) {
+          // rückwärts fahren
+        } else {
+          // stillstand
+        }
+        
+      }
+      
+      // TODO -> lagere ThrottleSensor aus. Soll zurück geben ob VOR- oder RÜCKwärts und wievie % vom Schub
+
+      if(_currentThrottleVal <= MAXSENSORVAL) {
+        speedInPercent = _currentThrottleVal / MAXSENSORVAL;
+      }
+
+      // undraw old triangle
+      display.fillTriangle(x1, y1, x2, y2, x3, y3, SSD1306_BLACK);
+      
+      double angle = 90 * speedInPercent;
+      double bogenmass = (angle / 180)  * M_PI;
+
+      /*x3 = 64-(cos(bogenmass) * needleLengh);
+      y3 = 60-(sin(bogenmass) * needleLengh);*/
+
+      x3tmp = (cos(bogenmass) * needleLengh);
+      y3tmp = (sin(bogenmass) * needleLengh);
+
+      x3 = 64 - x3tmp;
+      y3 = 60 - y3tmp;
+
+      if(DebugMode) {
+        Serial.println("x3");
+        Serial.println(x3tmp);
+        Serial.println("y3");
+        Serial.println(y3tmp);
+      }
+        
+      // draw new triangle
+      display.fillTriangle(x1, y1, x2, y2, x3, y3, SSD1306_WHITE);
+      display.display();
+
+      _oldThrottleVal = _currentThrottleVal;
+    }
+
+    UpdateTrottle();
+  }
+  while(true);
+}
+
+void ModeTwo(Mode selectedMode) { //Ask for Racer Confirmation
+  Serial.println("Now in ModeTwo.");
+  switch(lastMode) { // Sobald dieser Teil ausgeführt wird, geht nix mehr
+    case Mode::One:
+      Serial.println("1");
+      break;
+    case Mode::Two:
+      Serial.println("2");
+      break;
+    case Mode::Tree:
+      Serial.println("3");
+      break;
+    default:
+      Serial.println("d");
+      break;
+  }
+
+/*  display.clearDisplay();
+  display.setCursor(0,0);
+  display.write("Antwort eingeben");
+  display.display();
+
+  int trial;
+  for(trial = 0; trial <= 3; trial++) {
+    display.fillRect(0,20,SCREEN_WIDTH,8,0);
+    display.setCursor(0,30);
+
+    // Generiere Zufallsrechnung
+    int termType = rand() % 3;
+    int numberA = rand() % 20;
+    int numberB = rand() % 20;
+    String term = "";
+    int solution, userInput;
+
+    switch(termType) {
+      case 0:
+        Serial.print("Add:");
+        Serial.print(numberA);
+        term += numberA;
+        Serial.print(" + ");
+        term += " + ";
+        Serial.print(numberB);
+        term += numberB;
+        term += " = ";
+        solution = numberA+numberB;
+        Serial.println(solution);
+        break;
+      case 1:
+        Serial.println("Sub");
+        if(numberA<numberB) {
+          Serial.print(numberB);
+          term += numberB;
+          Serial.print(" - ");
+          term += " - ";
+          Serial.print(numberA);
+          term += numberA;
+          solution = numberB-numberA;
+        } else {
+          Serial.print(numberA);
+          term += numberA;
+          Serial.print(" - ");
+          term += " - ";
+          Serial.print(numberB);
+          term += numberB;
+          term += " = ";
+          solution = numberA-numberB;
+        }
+        Serial.print(" = ");
+        Serial.println(solution);
+        break;
+      case 3:
+        Serial.println("Mult");
+        Serial.print(numberA);
+        term += numberA;
+        Serial.print(" * ");
+        term += " * ";
+        Serial.print(numberB);
+        term += numberB;
+        term += " = ";
+        solution = numberA*numberB;
+        Serial.print(" = ");
+        Serial.println(solution);
+        break;
+      default:
+        break;
+    }
+    display.write(term);
+    do { // Buttoneingaben abfangen, sobald fertig -> break;
+      // userInput einlesen
+    }
+    while(true); // wiederholt Buttoneingaben sonst unendlich
+
+    if(userInput == solution) {
+        // userProfile auf Raser setzen
+        // break; // Schleife abbrechen
+    } else {
+
+    }
+  }
+  // ModusOne setzen
+  */
+
+  do{
+    Serial.println("Check Button Middle");
+    if(digitalRead(PinButtonMiddle) == LOW) {
+      Serial.println("ButtonMiddle was pressed - set Mode to ModeTree");
+      lastMode = Mode::Two;
+      currentMode = Mode::Tree;
+      break;
+    }
+    delay(1000);
+  }
+  while(true);
+}
+
+void ModeTree() {
+  Serial.println("Now in ModeTree. Old was: ");
+
+ switch(lastMode) { // Sobald dieser Teil ausgeführt wird, geht nix mehr
+    case Mode::One:
+      //Serial.println("Old Mode was ONE"); //tut nix
+      //Serial.println("Old Mode was 1"); // tut nix
+      // Serial.println("Old Mode 1"); tut
+      Serial.println("1");
+      break;
+    case Mode::Two:
+      //Serial.println("Old Mode was ONE"); //tut nix
+      //Serial.println("Old Mode was 1"); // tut nix
+      // Serial.println("Old Mode 1"); tut
+      //delay(100);
+      Serial.println("2");
+      break;
+    case Mode::Tree:
+      //Serial.println("Old Mode was ONE"); //tut nix
+      //Serial.println("Old Mode was 1"); // tut nix
+      // Serial.println("Old Mode 1"); tut
+      Serial.println("3");
+      //delay(500);
+      break;
+    default:
+      //delay(1000);
+      Serial.println("d");
+      break;
+  }
+
+  do{
+    Serial.println("Check Button Middle");
+    if(digitalRead(PinButtonMiddle) == LOW) {
+      Serial.println("ButtonMiddle was pressed - set Mode to ModeOne");
+      lastMode = Mode::Tree;
+      currentMode = Mode::One;
+      break;
+    }
+    delay(1000);
+  }
+  while(true);
+
+  // Config Menu
 
 }
 
-void ManageDisplay(){
-  String sDisplay;
-  sDisplay += "PotiVal:=";
-  sDisplay += TrottleSensorVal;
-  sDisplay += "\nTorqVal:=";
-  sDisplay += Torque;
-  sDisplay += "\nBattV:=";
-  sDisplay += BusVoltage;
-  display.clearDisplay();
-  display.setCursor(0, 0);     // Start at top-left corner
-  display.print(sDisplay.c_str());
-  display.display();
+
+void CheckMode(){
+  Serial.println("Now in CheckMode");
+  switch(currentMode) {
+    case Mode::One:
+      Serial.println("now in case Mode::One");
+      ModeOne();
+      Serial.println("returned from Mode::One");
+      break;
+    case Mode::Two:
+      Serial.println("now in case Mode::Two");
+      ModeTwo(currentMode);
+      Serial.println("returned from Mode:Two");
+      break;
+    case Mode::Tree:
+      Serial.println("now in case Mode::Tree");
+      ModeTree();
+      Serial.println("returned from Mode:Tree");
+      break;
+    default:
+      Serial.println("Unknown Case handled");
+  };
+  waitButtonPress();
 }
