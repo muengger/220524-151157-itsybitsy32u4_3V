@@ -238,20 +238,14 @@ void setup() {
 }
 
 void loop() {
-  Serial.println("We are in the main loop");
   static uint8_t toggle=0;
   static unsigned long timeOld = 0;
   unsigned long timeNew = millis();
   if((timeOld+100) < timeNew){ //Run with 10Hz // TODO move this value to a global variable, so every loop can use this value... e.g. the Battery-Object which start to BLINK every 1sec if voltage is near to critical value
-    Serial.println("loop: inside if");
     timeOld = timeNew;
-    
     CheckMode();
-  
     digitalWrite(PinLed,toggle);
     toggle ^= 1;
-  } else {
-    Serial.println("loop: inside else");
   }
 }
 
@@ -267,7 +261,6 @@ void serial_flush() {
 
 int ReadTrottleSensor() {
   int _TrottleSensorVal;
-  //Serial.println("Read ThrottleSens");
   _TrottleSensorVal = analogRead(PinTrottleSensor);
   TrottleSensorVal = _TrottleSensorVal;
   return _TrottleSensorVal;
@@ -290,9 +283,7 @@ void UpdateTrottle(){ // TODO Umbauen. Soll einen % Wert vom Maximal möglichen 
 
 
 void UpdateBusVoltage(){
-  //Serial.println("Updating Bus Voltage");
   String Buffer;
-
   serial_flush();
   Serial1.write("r vbus_voltage\n");
   Serial1.flush();
@@ -300,7 +291,6 @@ void UpdateBusVoltage(){
 }
 
 void ManagePowerSwitch(){
-  //Serial.println("Managing Power Switch");
   static uint32_t counter = 0;
   if(digitalRead(PinButtonOn)==1){
     counter++;
@@ -342,13 +332,10 @@ void ModeOne() { // Driving
   int16_t x3, y3;
   double x3tmp, y3tmp;
 
-  Serial.println("Now in ModeOne.");
-
   UpdateBusVoltage();
   ManagePowerSwitch();
   
   do{
-    //Serial.println("Check Button Middle");
     if(digitalRead(PinButtonMiddle) == LOW) {
       Serial.println("ButtonMiddle was pressed - set Mode to ModeTwo");
       lastMode = Mode::One;
@@ -358,7 +345,6 @@ void ModeOne() { // Driving
 
     _currentThrottleVal = ReadTrottleSensor();
     if(_currentThrottleVal == _oldThrottleVal) {
-      //Serial.println("Not changed speed");
     } else {
       Serial.println("Speed changed");
       if(_currentThrottleVal>MIDDLESENSORVAL) {
@@ -409,16 +395,12 @@ void ModeTwo(Mode selectedMode) { //Ask for Racer Confirmation
   Serial.println("Now in ModeTwo.");
   switch(lastMode) { // Sobald dieser Teil ausgeführt wird, geht nix mehr
     case Mode::One:
-      Serial.println("1");
       break;
     case Mode::Two:
-      Serial.println("2");
       break;
     case Mode::Tree:
-      Serial.println("3");
       break;
     default:
-      Serial.println("d");
       break;
   }
 
@@ -508,7 +490,6 @@ void ModeTwo(Mode selectedMode) { //Ask for Racer Confirmation
   */
 
   do{
-    Serial.println("Check Button Middle");
     if(digitalRead(PinButtonMiddle) == LOW) {
       Serial.println("ButtonMiddle was pressed - set Mode to ModeTree");
       lastMode = Mode::Two;
@@ -521,32 +502,14 @@ void ModeTwo(Mode selectedMode) { //Ask for Racer Confirmation
 }
 
 void ModeTree() {
-  Serial.println("Now in ModeTree. Old was: ");
-
  switch(lastMode) { // Sobald dieser Teil ausgeführt wird, geht nix mehr
     case Mode::One:
-      //Serial.println("Old Mode was ONE"); //tut nix
-      //Serial.println("Old Mode was 1"); // tut nix
-      // Serial.println("Old Mode 1"); tut
-      Serial.println("1");
       break;
     case Mode::Two:
-      //Serial.println("Old Mode was ONE"); //tut nix
-      //Serial.println("Old Mode was 1"); // tut nix
-      // Serial.println("Old Mode 1"); tut
-      //delay(100);
-      Serial.println("2");
       break;
     case Mode::Tree:
-      //Serial.println("Old Mode was ONE"); //tut nix
-      //Serial.println("Old Mode was 1"); // tut nix
-      // Serial.println("Old Mode 1"); tut
-      Serial.println("3");
-      //delay(500);
       break;
     default:
-      //delay(1000);
-      Serial.println("d");
       break;
   }
 
@@ -568,22 +531,15 @@ void ModeTree() {
 
 
 void CheckMode(){
-  Serial.println("Now in CheckMode");
   switch(currentMode) {
     case Mode::One:
-      Serial.println("now in case Mode::One");
       ModeOne();
-      Serial.println("returned from Mode::One");
       break;
     case Mode::Two:
-      Serial.println("now in case Mode::Two");
       ModeTwo(currentMode);
-      Serial.println("returned from Mode:Two");
       break;
     case Mode::Tree:
-      Serial.println("now in case Mode::Tree");
       ModeTree();
-      Serial.println("returned from Mode:Tree");
       break;
     default:
       Serial.println("Unknown Case handled");
