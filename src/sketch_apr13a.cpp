@@ -153,21 +153,25 @@ class ViewBattery {
   public:
     static void setStatus(int currentStatus) {
       if(currentStatus == lastStatus) {
-        Serial.println("Still same Battery Status");
-        //display.startscrollleft(0x00,0x0F);
+        //Serial.print("Still same Battery Status");
+        //Serial.println(currentStatus);
+        //display.startscrollleft(0x00,0x0F); kommt am andere Ende wieder rein
       } else {
-        Serial.println("Status changed");
-        /*
-        display.fillRect(screenPosX+2,10,totalWidth-2,44,0);
+        //Serial.println("Status changed");
+        //display.fillRect(screenPosX+1,9,totalWidth-2,44,0);
+        display.fillRoundRect(screenPosX+1,9,totalWidth-2,45,totalWidth/10,SSD1306_BLACK);;
         int bar;
         int barCount;
 
         //barCount=(currentStatus+19)/20; // how many bars? 100%-81% = 5, 80%-61% = 4, 60% - 41% = 3, 40% - 21% = 2, 20% - 1% = 1, below 0% = 0;
         barCount = (currentStatus+10)/20; // how many bars? 100%-90% = 5, 89%-70% = 4, 69% - 50% = 3, 49% - 30% = 2, 29% - 10% = 1, below 10% = 0;
-        for(bar=0;bar<=barCount;bar++) {
-          display.fillRect(screenPosX+2, 53-(bar*9), totalWidth-2, 8, SSD1306_WHITE); // draw rectancles of 8px height, move 9px to top
-        }*/
+        //Serial.print("BarCount");
+        //Serial.print(barCount);
+        for(bar=0;bar<barCount;bar++) {
+          display.fillRect(screenPosX+2, 46-(bar*9), totalWidth-4, 8, SSD1306_WHITE); // draw rectancles of 8px height, move 9px to top
+        }
         lastStatus = currentStatus ;
+        display.display();
       }
     };
 /*
@@ -202,13 +206,14 @@ class ViewBattery {
       Serial.println(screenPosX);
       Serial.println("widt");
       Serial.println(totalWidth);
-      display.drawRoundRect(screenPosX,8,totalWidth,46,2,SSD1306_WHITE); // draw Battery shape
-      display.fillRect(screenPosX,6,totalWidth/2,2,SSD1306_WHITE); // button at the top
+      display.drawRoundRect(screenPosX,8,totalWidth,48,totalWidth/10,SSD1306_WHITE); // draw Battery shape
+      display.fillRect(screenPosX+(totalWidth/4),6,totalWidth/2,2,SSD1306_WHITE); // button at the top
       display.display();
+      //waitButtonPress();
     }
 };
-int ViewBattery::screenPosX = 102;
-int ViewBattery::totalWidth = 20;
+int ViewBattery::screenPosX = 90;
+int ViewBattery::totalWidth = 32;
 int ViewBattery::lastStatus = 0;
 
 
@@ -332,9 +337,7 @@ void waitButtonPress() {
 void Driving() { // Driving
   UpdateBusVoltage();
   ManagePowerSwitch();
-  waitButtonPress();
   ViewBattery::showBattery();
-  waitButtonPress();
   // ************** code needed for throttle gauge ******************* //
   /*double _oldThrottleVal = ReadTrottleSensor();
   double _currentThrottleVal;
@@ -392,8 +395,20 @@ void Driving() { // Driving
 
       _oldThrottleVal = _currentThrottleVal;
     }*/
+    
+    ReadTrottleSensor();
+    //Serial.print("Throttle");
+    //Serial.print(TrottleSensorVal);
+    //Serial.print("Percentage");
+    double newMix;
+    double val = TrottleSensorVal;
+    double maxVal = MAXSENSORVAL;
+    newMix = 100*val/maxVal;
+    //Serial.print(newMix);
+    //ViewBattery::setStatus(TrottleSensorVal/MAXSENSORVAL);
+    ViewBattery::setStatus(newMix);
 
-    ViewBattery::setStatus(50);
+
     UpdateTrottle();
   }
   while(true);
