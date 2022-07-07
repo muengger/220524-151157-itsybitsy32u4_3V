@@ -42,8 +42,14 @@ int PinHoldPower = 10;
 int PinI2CSCL = 3;
 int PinI2CSDA = 2;
 
+double batFullVoltage = 42;
+double batLowVoltage = 33;
+
 Button ButtonLeft = Button(PinButtonLeft);
+Button ButtonRight = Button(PinButtonRight);
 Button ButtonMiddle = Button(PinButtonMiddle);
+Button ButtonUp = Button(PinButtonUp);
+Button ButtonDown = Button(PinButtonDown);
 
 // Global ENUMs
 Mode currentMode = Mode::Driving;
@@ -101,6 +107,7 @@ void ConfirmAge();
 
 void waitButtonPress();
 void showBattery();
+void SensorValScreen();
 
 void serial_flush() ;
 
@@ -145,6 +152,7 @@ class ViewBattery {
   static uint16_t counter;
   static int lastStatus; // 0 to 100%
   static int criticalStatus; // values below this will provoque an alert!
+  static int blinkCounter;
 
   public:
     static int screenPosX;
@@ -153,23 +161,48 @@ class ViewBattery {
   public:
     static void setStatus(int currentStatus) {
       if(currentStatus == lastStatus) {
-        //Serial.print("Still same Battery Status");
-        //Serial.println(currentStatus);
-        //display.startscrollleft(0x00,0x0F); kommt am andere Ende wieder rein
+        if(currentStatus == 0) {
+          Serial.print("Bat empty. Couter at ");
+          Serial.println(blinkCounter);
+          if(blinkCounter==100) { // falls 200 erreicht, ausblenden
+            Serial.println("HIDE");
+            hideBattery();
+            blinkCounter = 0; // zähler zurücksetzen
+          } else {
+            if(blinkCounter==50) { // falls 100 erreicht, einblenden
+              Serial.println("SHOW");
+              showBattery();
+            } 
+            Serial.println("do nothing");
+            blinkCounter++; // und weiter hochzählen
+          }
+        }
       } else {
-        //Serial.println("Status changed");
-        //display.fillRect(screenPosX+1,9,totalWidth-2,44,0);
+        if(lastStatus == 0) {
+          showBattery();
+        }
         display.fillRoundRect(screenPosX+1,9,totalWidth-2,45,totalWidth/10,SSD1306_BLACK);;
         int bar;
         int barCount;
 
         //barCount=(currentStatus+19)/20; // how many bars? 100%-81% = 5, 80%-61% = 4, 60% - 41% = 3, 40% - 21% = 2, 20% - 1% = 1, below 0% = 0;
         barCount = (currentStatus+10)/20; // how many bars? 100%-90% = 5, 89%-70% = 4, 69% - 50% = 3, 49% - 30% = 2, 29% - 10% = 1, below 10% = 0;
-        //Serial.print("BarCount");
-        //Serial.print(barCount);
+
         for(bar=0;bar<barCount;bar++) {
-          display.fillRect(screenPosX+2, 46-(bar*9), totalWidth-4, 8, SSD1306_WHITE); // draw rectancles of 8px height, move 9px to top
+          display.fillRect(screenPosX+3, 46-(bar*9), totalWidth-6, 8, SSD1306_WHITE); // draw rectancles of 8px height, move 9px to top
         }
+
+        // TODO positioniere % angaben mittig
+        /*String statusPercent = currentStatus;
+        int16_t x1, y1;
+        uint16_t w, h;
+        display.getTextBounds(currentStatus, 0, 0, &x1, &y1, &w, &h);*/
+        display.fillRect(screenPosX,SCREEN_HEIGHT-7,totalWidth,8,SSD1306_BLACK);
+        display.setCursor(screenPosX+(totalWidth/2)-7,SCREEN_HEIGHT-7);
+        display.print(currentStatus);
+        display.print("%");
+        // END TODO
+
         lastStatus = currentStatus ;
         display.display();
       }
@@ -192,31 +225,43 @@ class ViewBattery {
 
   */
     static void showBattery() {
-      Serial.println("ShowBattery");
-      drawBattery(false);
+      drawBattery(true);
     };
   
   private:
-    //static void hideBattery() {
-     // drawBattery(true);
-    //};
+    static void hideBattery() {
+      drawBattery(false);
+    };
 
     static void drawBattery(bool drawMode) {
-      Serial.println("Draw at X");
-      Serial.println(screenPosX);
-      Serial.println("widt");
-      Serial.println(totalWidth);
-      display.drawRoundRect(screenPosX,8,totalWidth,48,totalWidth/10,SSD1306_WHITE); // draw Battery shape
-      display.fillRect(screenPosX+(totalWidth/4),6,totalWidth/2,2,SSD1306_WHITE); // button at the top
+      display.drawRoundRect(screenPosX,8,totalWidth,48,totalWidth/10,drawMode); // draw Battery shape
+      display.fillRect(screenPosX+(totalWidth/4),6,totalWidth/2,2,drawMode); // button at the top
       display.display();
-      //waitButtonPress();
     }
 };
 int ViewBattery::screenPosX = 90;
 int ViewBattery::totalWidth = 32;
 int ViewBattery::lastStatus = 0;
+int ViewBattery::blinkCounter = 0;
 
-
+void SensorValScreen(){
+  do {
+    String sDisplay;
+    sDisplay += "PotiVal:=";
+    sDisplay += TrottleSensorVal;
+    sDisplay += "\nTorqVal:=";
+    sDisplay += Torque;
+    sDisplay += "\nBattV:=";
+    sDisplay += BusVoltage;
+    display.clearDisplay();
+    display.setCursor(0, 0);     // Start at top-left corner
+    display.print(sDisplay.c_str());
+    display.display();
+    if(ButtonLeft.onPress()) {
+      break;
+    }
+  } while(true);
+}
 
 void setup() {
   int motornum = 0;
@@ -337,6 +382,9 @@ void waitButtonPress() {
 void Driving() { // Driving
   UpdateBusVoltage();
   ManagePowerSwitch();
+  display.clearDisplay();
+  
+  ViewBattery::setStatus(0);
   ViewBattery::showBattery();
   // ************** code needed for throttle gauge ******************* //
   /*double _oldThrottleVal = ReadTrottleSensor();
@@ -352,11 +400,16 @@ void Driving() { // Driving
   double x3tmp, y3tmp;
 */
   do{
-    if(digitalRead(PinButtonMiddle) == LOW) {
-      Serial.println("ButtonMiddle was pressed - set Mode to ModeTwo");
+    ButtonMiddle.refresh();
+    ButtonLeft.refresh();
+    if(ButtonMiddle.isLongPress()) {
+      Serial.println("ButtonMiddle was pressed - set Mode to ConfirmAge");
       lastMode = Mode::Driving;
       currentMode = Mode::ConfirmAge;
       break;
+    }
+    if(ButtonLeft.isLongPress()) {
+      SensorValScreen();
     }
 
     /*_currentThrottleVal = ReadTrottleSensor();
@@ -426,14 +479,14 @@ void ConfirmAge() { //Ask for Racer Confirmation
       break;
   }
 
-/*  display.clearDisplay();
+  display.clearDisplay();
   display.setCursor(0,0);
   display.write("Antwort eingeben");
   display.display();
 
   int trial;
-  for(trial = 0; trial <= 3; trial++) {
-    display.fillRect(0,20,SCREEN_WIDTH,8,0);
+  for(trial = 0; trial < 4; trial++) {
+    display.fillRect(0,30,SCREEN_WIDTH,8,0);
     display.setCursor(0,30);
 
     // Generiere Zufallsrechnung
@@ -495,23 +548,59 @@ void ConfirmAge() { //Ask for Racer Confirmation
       default:
         break;
     }
-    display.write(term);
+    display.print(term);
+    display.display();
+    
+    int cursorX = display.getCursorX();
+    // TODO create INPUT FIELD
+    userInput = 0;
     do { // Buttoneingaben abfangen, sobald fertig -> break;
+      ButtonLeft.refresh();
+      ButtonRight.refresh();
+      ButtonMiddle.refresh();
       // userInput einlesen
+      display.setCursor(cursorX,display.getCursorY());
+      display.fillRect(display.getCursorX(),display.getCursorY(),21,8,SSD1306_BLACK);
+      display.print(userInput);
+      display.display();
+      if(ButtonLeft.onPress()) {
+        userInput--;
+        Serial.println("Dec input");
+      }
+      if(ButtonLeft.isLongPress()) {
+        userInput -= 2;
+        Serial.println("Dec input");
+      }
+      if(ButtonRight.onPress()) {
+        userInput++;
+        Serial.println("Incr input");
+      }
+      if(ButtonRight.isLongPress()) {
+        userInput += 2;
+        Serial.println("Dec input");
+      }
+      if(ButtonMiddle.onPress()) {
+        Serial.println("Conf inp");
+        break;
+      }
     }
     while(true); // wiederholt Buttoneingaben sonst unendlich
 
     if(userInput == solution) {
-        // userProfile auf Raser setzen
-        // break; // Schleife abbrechen
+        Serial.println("age confirmed");
+        // setze userlimiten neu
+        delay(1000);
+        break; // Schleife abbrechen
     } else {
-
+        Serial.println("retry");
     }
   }
   // ModusOne setzen
-  */
+  Serial.println("go back to drive");
+  currentMode = Mode::Driving;
+  delay(500);
 
-  do{
+  /*do{
     if(digitalRead(PinButtonMiddle) == LOW) {
       Serial.println("ButtonMiddle was pressed - set Mode to ModeTree");
       lastMode = Mode::ConfirmAge;
@@ -520,7 +609,7 @@ void ConfirmAge() { //Ask for Racer Confirmation
     }
     delay(1000);
   }
-  while(true);
+  while(true);*/
 }
 
 void ManageSettings() {
