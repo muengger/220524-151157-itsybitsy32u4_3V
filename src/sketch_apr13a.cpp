@@ -65,17 +65,13 @@ float BusVoltage; // Spannung der Batterie
 // float BatVoltageWarn = 25 // unter dieser Spannung wird gewarnt // TODO via Konfig änderbar
 // float BatVoltageMin = 23 // Minimale Batteriespannung -> 0 % -> muss abstellen // TODO via Konfig änderbar
 
-// int ThrottleMax = 955; // Maximaler Wert für Temposensor -> volles Tempo vorwärts // TODO via Konfi änderbar
-// int ThrottleStop = 340; // Temposensorwert für Stillstand // TODO via Konfi änderbar
-// int ThrottleMin = 0; // Maximaler Wert für Temposensor -> volles Tempor rückwärts // TODO via Konfi änderbar
+int ThrottleMax = 955; // Maximaler Wert für Temposensor -> volles Tempo vorwärts // TODO via Konfi änderbar 
+int ThrottleStop = 340; // Temposensorwert für Stillstand // TODO via Konfi änderbar
+int ThrottleMin = 0; // Maximaler Wert für Temposensor -> volles Tempor rückwärts // TODO via Konfi änderbar
 
 // int MaxKMHForward = 20; // Anhand Durchmesser und Umdrehungen / Sekunde berechnete Maximalgeschwindigkeit vorwärts // TODO via Konfi änderbar
 // int MaxKMHBackward = 5; // Anhand Durchmesser und Umdrehungen / Sekunde berechnete Maximalgeschwindigkeit rückwärts // TODO via Konfi änderbar
 
-
-#define MAXSENSORVAL 955 // Maximalwert des Geschwindigkeitsreglers
-#define MINSENSORVAL 0 // Minimalwert des Geschwindigkeitsreglers
-#define MIDDLESENSORVAL 340 // Mittelwert des Geschwindigkeitsreglers. Alles darüber ist vorwärts fahren, alles darunter ist rückwärts fahren
 #define HYSTSENSORVAL 10
 #define MAXTORQUE 3 // maximaler Drehmoment
 
@@ -329,10 +325,10 @@ int ReadTrottleSensor() {
 void UpdateTrottle(){ // TODO Umbauen. Soll einen % Wert vom Maximal möglichen Speed vor- oder rückwärts als Parameter erhalten
   float temp = TrottleSensorVal;
   Torque =0;
-  if(TrottleSensorVal > MIDDLESENSORVAL + HYSTSENSORVAL){
-    Torque = ((temp - (MIDDLESENSORVAL + HYSTSENSORVAL))*MAXTORQUE)/(MAXSENSORVAL -(MIDDLESENSORVAL + HYSTSENSORVAL));
-  }else if (TrottleSensorVal < MIDDLESENSORVAL - HYSTSENSORVAL){
-    Torque = ((temp/(MIDDLESENSORVAL - HYSTSENSORVAL))-1)*MAXTORQUE;
+  if(TrottleSensorVal > ThrottleStop + HYSTSENSORVAL){
+    Torque  = ((temp - (ThrottleStop + HYSTSENSORVAL))*MAXTORQUE)/(ThrottleMax -(ThrottleStop + HYSTSENSORVAL));
+  }else if (TrottleSensorVal < ThrottleStop - HYSTSENSORVAL){
+    Torque = ((temp/(ThrottleStop - HYSTSENSORVAL))-1)*MAXTORQUE;
   }
   String command = "r axis0.controller.input_torque = ";
   command += Torque;
@@ -409,17 +405,19 @@ void Driving() { // Driving
       break;
     }
     if(ButtonLeft.isLongPress()) {
-      SensorValScreen();
+      if(ButtonRight.isLongPress()) {
+        SensorValScreen();
+      }
     }
 
     /*_currentThrottleVal = ReadTrottleSensor();
     if(_currentThrottleVal == _oldThrottleVal) {
     } else {
       Serial.println("Speed changed");
-      if(_currentThrottleVal>MIDDLESENSORVAL) {
+      if(_currentThrottleVal>ThrottleStop) {
         // forwärts fahren
       } else {
-        if(_currentThrottleVal<MIDDLESENSORVAL) {
+        if(_currentThrottleVal<ThrottleStop) {
           // rückwärts fahren
         } else {
           // stillstand
@@ -429,8 +427,8 @@ void Driving() { // Driving
       
       // TODO -> lagere ThrottleSensor aus. Soll zurück geben ob VOR- oder RÜCKwärts und wievie % vom Schub
 
-      if(_currentThrottleVal <= MAXSENSORVAL) {
-        speedInPercent = _currentThrottleVal / MAXSENSORVAL;
+      int _currentThrottleVal = <= ThrottleMax) {
+        int = = _currentThrottleVal / ThrottleMax;
       }
 
       // undraw old triangle
@@ -455,10 +453,10 @@ void Driving() { // Driving
     //Serial.print("Percentage");
     double newMix;
     double val = TrottleSensorVal;
-    double maxVal = MAXSENSORVAL;
+    int maxVal = ThrottleMax;
     newMix = 100*val/maxVal;
     //Serial.print(newMix);
-    //ViewBattery::setStatus(TrottleSensorVal/MAXSENSORVAL);
+    //ViewBattery::setStatus(TrottleSensorVal/ThrottleMax);
     ViewBattery::setStatus(newMix);
 
 
@@ -481,12 +479,12 @@ void ConfirmAge() { //Ask for Racer Confirmation
 
   display.clearDisplay();
   display.setCursor(0,0);
-  display.write("Antwort eingeben");
+  display.write("Rechne aus:");
   display.display();
 
   int trial;
   for(trial = 0; trial < 4; trial++) {
-    display.fillRect(0,30,SCREEN_WIDTH,8,0);
+    display.fillRect(0,20,SCREEN_WIDTH,SCREEN_HEIGHT-20,0);
     display.setCursor(0,30);
 
     // Generiere Zufallsrechnung
@@ -502,10 +500,10 @@ void ConfirmAge() { //Ask for Racer Confirmation
         Serial.print(numberA);
         term += numberA;
         Serial.print(" + ");
-        term += " + ";
+        term += "+";
         Serial.print(numberB);
         term += numberB;
-        term += " = ";
+        term += "=";
         solution = numberA+numberB;
         Serial.println(solution);
         break;
@@ -515,7 +513,7 @@ void ConfirmAge() { //Ask for Racer Confirmation
           Serial.print(numberB);
           term += numberB;
           Serial.print(" - ");
-          term += " - ";
+          term += "-";
           Serial.print(numberA);
           term += numberA;
           solution = numberB-numberA;
@@ -523,10 +521,10 @@ void ConfirmAge() { //Ask for Racer Confirmation
           Serial.print(numberA);
           term += numberA;
           Serial.print(" - ");
-          term += " - ";
+          term += "-";
           Serial.print(numberB);
           term += numberB;
-          term += " = ";
+          term += "=";
           solution = numberA-numberB;
         }
         Serial.print(" = ");
@@ -537,10 +535,10 @@ void ConfirmAge() { //Ask for Racer Confirmation
         Serial.print(numberA);
         term += numberA;
         Serial.print(" * ");
-        term += " * ";
+        term += "*";
         Serial.print(numberB);
         term += numberB;
-        term += " = ";
+        term += "=";
         solution = numberA*numberB;
         Serial.print(" = ");
         Serial.println(solution);
@@ -548,6 +546,7 @@ void ConfirmAge() { //Ask for Racer Confirmation
       default:
         break;
     }
+    display.setTextSize(2);
     display.print(term);
     display.display();
     
@@ -560,7 +559,7 @@ void ConfirmAge() { //Ask for Racer Confirmation
       ButtonMiddle.refresh();
       // userInput einlesen
       display.setCursor(cursorX,display.getCursorY());
-      display.fillRect(display.getCursorX(),display.getCursorY(),21,8,SSD1306_BLACK);
+      display.fillRect(display.getCursorX(),display.getCursorY(),22,16,SSD1306_BLACK);
       display.print(userInput);
       display.display();
       if(ButtonLeft.onPress()) {
@@ -583,50 +582,89 @@ void ConfirmAge() { //Ask for Racer Confirmation
         Serial.println("Conf inp");
         break;
       }
+      if(ButtonLeft.isLongPress()) {
+        if(ButtonRight.isLongPress()) {
+          if(ButtonMiddle.isLongPress()) {
+            Serial.print("next Menu!");
+            currentMode = Mode::ManageSettings;
+            break;
+          }
+        }
+      }
     }
     while(true); // wiederholt Buttoneingaben sonst unendlich
 
-    if(userInput == solution) {
+    display.setTextSize(1);
+
+    if(currentMode != Mode::ManageSettings) {
+      if(userInput == solution) {
         Serial.println("age confirmed");
         // setze userlimiten neu
         delay(1000);
         break; // Schleife abbrechen
-    } else {
+      } else {
         Serial.println("retry");
-    }
-  }
-  // ModusOne setzen
-  Serial.println("go back to drive");
-  currentMode = Mode::Driving;
-  delay(500);
-
-  /*do{
-    if(digitalRead(PinButtonMiddle) == LOW) {
-      Serial.println("ButtonMiddle was pressed - set Mode to ModeTree");
-      lastMode = Mode::ConfirmAge;
-      currentMode = Mode::ManageSettings;
+      }
+      Serial.println("go back to drive");
+      currentMode = Mode::Driving;
+    } else {
       break;
     }
-    delay(1000);
   }
-  while(true);*/
 }
 
 void ManageSettings() {
- switch(lastMode) { // Sobald dieser Teil ausgeführt wird, geht nix mehr
-    case Mode::Driving:
+int settingId = 10;
+
+switch(settingId) { // Sobald dieser Teil ausgeführt wird, geht nix mehr
+    case 1:
       break;
-    case Mode::ConfirmAge:
+    case 2:
       break;
-    case Mode::ManageSettings:
+    case 3:
       break;
     default:
       break;
   }
 
+  display.clearDisplay();
+  display.setCursor(0,0);
+  display.print("Einstellung:");
+  display.setCursor(84,0);
+  display.write(0x11);
+  display.print("10/14");
+  display.write(0x10);
+  display.drawFastHLine(1,9,SCREEN_WIDTH-2,SSD1306_WHITE);
+
+  display.setCursor(28,21);
+  display.println("Maximales Tempo"); // max 16 zeichen
+  display.setCursor(28,29);
+  display.println("   - Kind -");
+
+  /*int Tempo_bits[] = {
+   0x7f, 0xf8, 0x03, 0x0f, 0xc3, 0x03, 0xe7, 0x8f, 0x03, 0xb3, 0x2a, 0x03,
+   0xfb, 0x67, 0x03, 0xe9, 0x57, 0x02, 0xfd, 0xf3, 0x02, 0xf4, 0xb3, 0x00,
+   0xfe, 0xf9, 0x01, 0xfe, 0xf9, 0x01, 0xfa, 0x78, 0x01, 0xfe, 0xfc, 0x01,
+   0x74, 0xb8, 0x00, 0x7d, 0xf8, 0x02, 0xf9, 0x7f, 0x02, 0xfb, 0x7f, 0x03,
+   0xf3, 0x3f, 0x03, 0x07, 0x80, 0x03 };
+*/
+  //display.drawXBitmap(30,30, Tempo_bits, 18, 18, 111);
+
+  display.drawCircle(14,30,9, SSD1306_WHITE);
+  
+   display.setCursor(40,47);
+   display.write(0x1E);
+   display.setCursor(40,53);
+   display.write(0x1F);
+   
+   display.setCursor(48,50);
+   display.print("15 km/h");
+   display.display();
+
+
   do{
     Serial.println("Check Button Middle");
-    if(digitalRead(PinButtonMiddle) == LOW) {
+    if(ButtonLeft.onPress()) {
       Serial.println("ButtonMiddle was pressed - set Mode to Driving");
       lastMode = Mode::ManageSettings;
       currentMode = Mode::Driving;
