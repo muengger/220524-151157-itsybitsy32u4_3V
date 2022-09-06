@@ -1,0 +1,1 @@
+int WheelDiameter = 160; // Raddurchmesser in mm. Anhand Umdrehung könnte so das Tempo berechnet werden. // TODO via Konfig änderbar

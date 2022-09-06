@@ -1,0 +1,13 @@
+int PinTrottleSensor = 17; // ehem 27; //D9,A9 //Poti für Geschwindigkeit // TODO prüfen ob im M4 noch unterstütz an dieser Stelle -> wire manually
+int PinODRVSerialRX = 0; // -> wired manually
+int PinODRVSerialTX = 1; // -> wired manually
+int PinLed = 13; // -> wired manually
+int PinButtonUp = 19; // ehem 23 -> wired manually
+int PinButtonDown = 23; // ehem 14 -> wired manually
+int PinButtonRight = 24; //ehem 15 -> wired manually
+int PinButtonLeft = 25; //ehem 16 -> wired manually
+int PinButtonMiddle = 18; //ehem 22 -> wired manually
+int PinButtonOn = 11; // -> wired manually
+int PinHoldPower = 10; // -> wired manually
+int PinI2CSCL = 22; //ehem 3 -> wired manually
+int PinI2CSDA = 21; // ehem 21 -> wired manually

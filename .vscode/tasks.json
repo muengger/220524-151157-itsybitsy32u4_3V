@@ -1,0 +1,39 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"type": "PlatformIO",
+			"task": "Build (itsybitsy32u4_3VFeuerstuhl)",
+			"problemMatcher": [
+				"$platformio"
+			],
+			"group": "build",
+			"label": "PlatformIO: Build (itsybitsy32u4_3VFeuerstuhl)"
+		},
+		{
+			"type": "cppbuild",
+			"label": "C/C++: arm-none-eabi-gcc.exe Aktive Datei kompilieren",
+			"command": "C:/Users/BeatStieger/.platformio/packages/toolchain-gccarmnoneeabi/bin/arm-none-eabi-gcc.exe",
+			"args": [
+				"-fdiagnostics-color=always",
+				"-g",
+				"${file}",
+				"-o",
+				"${fileDirname}\\${fileBasenameNoExtension}.exe",
+				"-mfloat-abi=hard",
+				"-mfpu=fpv4-sp-d16",
+				"-mcpu=cortex-m4",
+				"-mthumb",
+				""
+			],
+			"options": {
+				"cwd": "C:/Users/BeatStieger/.platformio/packages/toolchain-gccarmnoneeabi/bin"
+			},
+			"problemMatcher": [
+				"$gcc"
+			],
+			"group": "build",
+			"detail": "Compiler: C:/Users/BeatStieger/.platformio/packages/toolchain-gccarmnoneeabi/bin/arm-none-eabi-gcc.exe"
+		}
+	]
+}

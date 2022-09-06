@@ -6,6 +6,16 @@
 // TODO DynamicValue Class -> nur innert eines gleichen loops verwendbar. Muss vorher instantiert werden. Merkt sich die CursorPosition, akzeptiert einen (Initial)Wert zur Ausgabe. Speichert den Wert und sobald ein neuer kommt, wird erst anhand Position und altem Wert, der alte überschrieben und der neue geschrieben
 // TODO ASCI Symbole zu finden unter https://forums.adafruit.com/viewtopic.php?f=8&t=51999
 
+// --- Config ---
+#include "config/Screen.h"
+#include "config/PinNumbers.h" // Hardware Arduino Pin Numbers
+#include "config/BatVoltageLimits.h" // Battery Voltage Limits -> move to EEPROM
+#include "config/ThrottleSensorValues.h" // Limits of Throttle Sensor
+#include "config/Wheel.h" // Wheel Mesurement
+#include "config/Engine.h" // Torque etc.
+// ---
+
+// --- Includes ---
 #include <SPI.h>
 #include <Wire.h>
 #include <Adafruit_GFX.h>
@@ -13,78 +23,57 @@
 #include <Adafruit_SPITFT.h>
 #include <Adafruit_SPITFT_Macros.h>
 #include <gfxfont.h>
-
 #include <Adafruit_SSD1306.h>
 #include <splash.h>
+#include <FlashAsEEPROM_SAMD.h>
 
 #include <ODriveArduino.h>
 #include <ODriveEnums.h>
 
 #include <HardwareSerial.h>
-
 #include <ButtonClass.h>
+#include "ThrottleSensor.h"
+#include "TermHelperClass.h"
+#include "ViewBattery.h"
 
-enum class Mode { Driving, ConfirmAge, ManageSettings };
-// the setup function runs once when you press reset or power the board
+#include "SettingsManager.h"
 
-//PINS
-int PinTrottleSensor = 27; //D9,A9 //Poti für Geschwindigkeit
-int PinODRVSerialRX = 0;
-int PinODRVSerialTX = 1;
-int PinLed = 13;
-int PinButtonUp = 23; // Button OBEN
-int PinButtonDown = 14; // Button UNTEN
-int PinButtonRight = 15; // Button  RECHTS
-int PinButtonLeft = 16; // Button LINKS
-int PinButtonMiddle = 22; // Button Mitte
-int PinButtonOn = 11; // Button ON ??? ganz unten???
-int PinHoldPower = 10;
-int PinI2CSCL = 3;
-int PinI2CSDA = 2;
+// ---
 
-double batFullVoltage = 42;
-double batLowVoltage = 33;
+// --- Define ENUMS ---
+enum class Mode { Driving, Statistics, ConfirmAge_Instructions, ConfirmAge_Trial1, ConfirmAge_Trial2, ConfirmAge_Trial3, ConfirmAge_FailedRetry, ConfirmAge_FailedExit, ConfirmAge_Success, ManageSettings };
+enum class Driver { Kid, Teen, Adult };
+enum class PersistedSetting { WheelDiameter };
 
+// -- Initialize Variables
+// Menu
+Mode currentMode = Mode::Driving;
+Mode lastMode;
+Driver currentDriver = Driver::Kid;
+Driver lastDriver;
+
+unsigned long ConfirmAgeStartTime = 0;
+int ConfirmAgeAnswer = 0;
+// ---
+
+// -- Initialize Objects
 Button ButtonLeft = Button(PinButtonLeft);
 Button ButtonRight = Button(PinButtonRight);
 Button ButtonMiddle = Button(PinButtonMiddle);
 Button ButtonUp = Button(PinButtonUp);
 Button ButtonDown = Button(PinButtonDown);
+ThrottleSensor ThrottleSensorMain = ThrottleSensor(ThrottleMinValue, ThrottleStopValue, ThrottleStopTolleranceRange, ThrottleMaxValue);
+//SettingsManager SettingsManager = SettingsManager; // original pos for global usage
 
-// Global ENUMs
-Mode currentMode = Mode::Driving;
-Mode lastMode = Mode::Driving;
+//TermHelper TermHelper = TermHelper();
+// ---
 
-// Global Variables
-int TrottleSensorVal = 0; // gemessener Wert des Geschwindigkeitsreglers
-float Torque = 0; // Drehmoment
-float BusVoltage; // Spannung der Batterie
-
-// int WheelDiameter = 160; // Raddurchmesser in mm. Anhand Umdrehung könnte so das Tempo berechnet werden. // TODO via Konfig änderbar
-// float BatVoltageMax = 33 // Maximum Batteriespannung -> 100% geladen // TODO via Konfig änderbar
-// float BatVoltageWarn = 25 // unter dieser Spannung wird gewarnt // TODO via Konfig änderbar
-// float BatVoltageMin = 23 // Minimale Batteriespannung -> 0 % -> muss abstellen // TODO via Konfig änderbar
-
-int ThrottleMax = 955; // Maximaler Wert für Temposensor -> volles Tempo vorwärts // TODO via Konfi änderbar 
-int ThrottleStop = 340; // Temposensorwert für Stillstand // TODO via Konfi änderbar
-int ThrottleMin = 0; // Maximaler Wert für Temposensor -> volles Tempor rückwärts // TODO via Konfi änderbar
-
-// int MaxKMHForward = 20; // Anhand Durchmesser und Umdrehungen / Sekunde berechnete Maximalgeschwindigkeit vorwärts // TODO via Konfi änderbar
-// int MaxKMHBackward = 5; // Anhand Durchmesser und Umdrehungen / Sekunde berechnete Maximalgeschwindigkeit rückwärts // TODO via Konfi änderbar
-
-#define HYSTSENSORVAL 10
-#define MAXTORQUE 3 // maximaler Drehmoment
-
-#define SCREEN_WIDTH 128 // OLED display width, in pixels
-#define SCREEN_HEIGHT 64 // OLED display height, in pixels
-
-#define OLED_RESET     4 // Reset pin # (or -1 if sharing Arduino reset pin)
-#define SCREEN_ADDRESS 0x3C ///< See datasheet for Address; 0x3D for 128x64, 0x3C for 128x32
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
-
+ViewBattery BatteryView(display);
 HardwareSerial& odrive_serial = Serial1;
 // ODrive object
 ODriveArduino odrive(odrive_serial);
+
 
 // Printing with stream operator helper functions
 template<class T> inline Print& operator <<(Print &obj,     T arg) { obj.print(arg);    return obj; }
@@ -92,33 +81,24 @@ template<>        inline Print& operator <<(Print &obj, float arg) { obj.print(a
 
 int SerialRead(char *Buff,int Size );
 
-int ReadTrottleSensor();
+void ReadTrottleSensor();
 void UpdateTrottle();
 void UpdateBusVoltage();
 void ManagePowerSwitch();
 
 void CheckMode();
 void Driving();
-void ConfirmAge();
+void ConfirmAge_Instructions();
+void ConfirmAge_Trial1();
+void ConfirmAge_Trial2();
+void ConfirmAge_Trial3();
 
-void waitButtonPress();
 void showBattery();
 void SensorValScreen();
 
+double getSpeedKmh();
+
 void serial_flush() ;
-
-/*
-class Debug {
-
-  void SerialOutput(String text) {
-    //
-  }
-
-  void WaitButtonPress(Button selectedButton) {
-    //
-  }
-};
-*/
 
 /* class CustomSetting { 
   public:
@@ -144,107 +124,21 @@ class Debug {
 };*/
 
 
-class ViewBattery {
-  static uint16_t counter;
-  static int lastStatus; // 0 to 100%
-  static int criticalStatus; // values below this will provoque an alert!
-  static int blinkCounter;
 
-  public:
-    static int screenPosX;
-    static int totalWidth;
-
-  public:
-    static void setStatus(int currentStatus) {
-      if(currentStatus == lastStatus) {
-        if(currentStatus == 0) {
-          Serial.print("Bat empty. Couter at ");
-          Serial.println(blinkCounter);
-          if(blinkCounter==100) { // falls 200 erreicht, ausblenden
-            Serial.println("HIDE");
-            hideBattery();
-            blinkCounter = 0; // zähler zurücksetzen
-          } else {
-            if(blinkCounter==50) { // falls 100 erreicht, einblenden
-              Serial.println("SHOW");
-              showBattery();
-            } 
-            Serial.println("do nothing");
-            blinkCounter++; // und weiter hochzählen
-          }
-        }
-      } else {
-        if(lastStatus == 0) {
-          showBattery();
-        }
-        display.fillRoundRect(screenPosX+1,9,totalWidth-2,45,totalWidth/10,SSD1306_BLACK);;
-        int bar;
-        int barCount;
-
-        //barCount=(currentStatus+19)/20; // how many bars? 100%-81% = 5, 80%-61% = 4, 60% - 41% = 3, 40% - 21% = 2, 20% - 1% = 1, below 0% = 0;
-        barCount = (currentStatus+10)/20; // how many bars? 100%-90% = 5, 89%-70% = 4, 69% - 50% = 3, 49% - 30% = 2, 29% - 10% = 1, below 10% = 0;
-
-        for(bar=0;bar<barCount;bar++) {
-          display.fillRect(screenPosX+3, 46-(bar*9), totalWidth-6, 8, SSD1306_WHITE); // draw rectancles of 8px height, move 9px to top
-        }
-
-        // TODO positioniere % angaben mittig
-        /*String statusPercent = currentStatus;
-        int16_t x1, y1;
-        uint16_t w, h;
-        display.getTextBounds(currentStatus, 0, 0, &x1, &y1, &w, &h);*/
-        display.fillRect(screenPosX,SCREEN_HEIGHT-7,totalWidth,8,SSD1306_BLACK);
-        display.setCursor(screenPosX+(totalWidth/2)-7,SCREEN_HEIGHT-7);
-        display.print(currentStatus);
-        display.print("%");
-        // END TODO
-
-        lastStatus = currentStatus ;
-        display.display();
-      }
-    };
 /*
-    static void isEmpty() { // 
-      if(lastStatus != 0) {
-        setStatus(0);
-      }
-      if(counter==200) { // falls 200 erreicht, ausblenden
-        hideBattery();
-        counter = 0; // zähler zurücksetzen
-      } else {
-        if(counter==100) { // falls 100 erreicht, einblenden
-          showBattery();
-        } 
-        counter++; // und weiter hochzählen
-      }
-    }
+void IconDrawer(int id, uint16_t xPos, uint16_t yPos) {
+  // width and height 18px
 
-  */
-    static void showBattery() {
-      drawBattery(true);
-    };
-  
-  private:
-    static void hideBattery() {
-      drawBattery(false);
-    };
+  // Throttle
+  display.drawRoundRect(xPos+2, yPos+12,14,6,3,SSD1306_WHITE);
+  display.fillRect(xPos,)
+}*/
 
-    static void drawBattery(bool drawMode) {
-      display.drawRoundRect(screenPosX,8,totalWidth,48,totalWidth/10,drawMode); // draw Battery shape
-      display.fillRect(screenPosX+(totalWidth/4),6,totalWidth/2,2,drawMode); // button at the top
-      display.display();
-    }
-};
-int ViewBattery::screenPosX = 90;
-int ViewBattery::totalWidth = 32;
-int ViewBattery::lastStatus = 0;
-int ViewBattery::blinkCounter = 0;
 
 void SensorValScreen(){
-  do {
     String sDisplay;
-    sDisplay += "PotiVal:=";
-    sDisplay += TrottleSensorVal;
+    sDisplay += "\nSpeedPerc.:=";
+    sDisplay += ThrottleSensorMain.getSpeedPromille();
     sDisplay += "\nTorqVal:=";
     sDisplay += Torque;
     sDisplay += "\nBattV:=";
@@ -253,10 +147,6 @@ void SensorValScreen(){
     display.setCursor(0, 0);     // Start at top-left corner
     display.print(sDisplay.c_str());
     display.display();
-    if(ButtonLeft.onPress()) {
-      break;
-    }
-  } while(true);
 }
 
 void setup() {
@@ -272,6 +162,18 @@ void setup() {
   pinMode(PinButtonMiddle,INPUT_PULLUP);
 
   Serial.begin(9600);
+  
+  while (!Serial);
+
+  delay(200);
+
+  //Serial.print(F("\nStart EEPROM_read on ")); Serial.println(BOARD_NAME);
+  //Serial.println(FLASH_STORAGE_SAMD_VERSION);
+
+  Serial.print("EEPROM length: ");
+  Serial.println(EEPROM.length());
+  delay(1000);
+
   digitalWrite(PinHoldPower,HIGH);
   delay(200);
   display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS);
@@ -285,24 +187,49 @@ void setup() {
   display.display();
   delay(1500);
 
-  odrive_serial.begin(57600);
-  Serial1.setTimeout(4);
-  requested_state = AXIS_STATE_CLOSED_LOOP_CONTROL;
+  //odrive_serial.begin(57600);
+  //Serial1.setTimeout(4);
+  //requested_state = AXIS_STATE_CLOSED_LOOP_CONTROL;
   //odrive.runState(motornum, requested_state, false /*don't wait*/); // comment as long drive is not connected!
-  display.clearDisplay();
-  display.display();
+  //display.clearDisplay();
+  //display.display();
 }
 
 void loop() {
+  //Serial.println("Loop Begin");
   static uint8_t toggle=0;
   static unsigned long timeOld = 0;
   unsigned long timeNew = millis();
+
   if((timeOld+100) < timeNew){ //Run with 10Hz // TODO move this value to a global variable, so every loop can use this value... e.g. the Battery-Object which start to BLINK every 1sec if voltage is near to critical value
+    //Serial.println("Loop: Running Code");
     timeOld = timeNew;
+
+    // read inputs / sensors ---
+    ButtonUp.refresh();
+    ButtonDown.refresh();
+    ButtonLeft.refresh();
+    ButtonRight.refresh();
+    ButtonMiddle.refresh();
+    ReadTrottleSensor();
+    // ---
+    
+    //UpdateBusVoltage(); //TOFIX currently stops script of running.
+
+    Serial.print("Last time, we saved at 0: ");
+    Serial.println(EEPROM.read(0));
+
+
+    ManagePowerSwitch();  
     CheckMode();
+    //SensorValScreen();
+
     digitalWrite(PinLed,toggle);
     toggle ^= 1;
+  } else {
+    //Serial.println("Loop: Skip Code");
   }
+  //Serial.println("Loop End");
 }
 
 int SerialRead(String * Buff,int Size ){
@@ -315,28 +242,24 @@ void serial_flush() {
   while (Serial1.available()) Serial1.read();
 }
 
-int ReadTrottleSensor() {
+void ReadTrottleSensor() { // TODO maybe a job for ThrottleSensorMain?
   int _TrottleSensorVal;
   _TrottleSensorVal = analogRead(PinTrottleSensor);
-  TrottleSensorVal = _TrottleSensorVal;
-  return _TrottleSensorVal;
+  ThrottleSensorMain.setValue(_TrottleSensorVal);
 }
 
-void UpdateTrottle(){ // TODO Umbauen. Soll einen % Wert vom Maximal möglichen Speed vor- oder rückwärts als Parameter erhalten
-  float temp = TrottleSensorVal;
+void UpdateTrottle(){ // TODO now we can't change the max torque or the current speed.... should be passed as parameter
   Torque =0;
-  if(TrottleSensorVal > ThrottleStop + HYSTSENSORVAL){
-    Torque  = ((temp - (ThrottleStop + HYSTSENSORVAL))*MAXTORQUE)/(ThrottleMax -(ThrottleStop + HYSTSENSORVAL));
-  }else if (TrottleSensorVal < ThrottleStop - HYSTSENSORVAL){
-    Torque = ((temp/(ThrottleStop - HYSTSENSORVAL))-1)*MAXTORQUE;
+  if(ThrottleSensorMain.isForward() == true){
+    Torque  = ThrottleSensorMain.getSpeedPromille()/(double)1000*MaxTorque;
+  }else if (ThrottleSensorMain.isForward() == false){
+    Torque = (ThrottleSensorMain.getSpeedPromille()/(double)1000)-1*MaxTorque;
   }
   String command = "r axis0.controller.input_torque = ";
   command += Torque;
   command += "\n";
   Serial1.write(command.c_str());
 }
-// TODO neue Funktion für das Auslesen des Wertes. 
-
 
 void UpdateBusVoltage(){
   String Buffer;
@@ -359,29 +282,22 @@ void ManagePowerSwitch(){
   }
 }
 
-void waitButtonPress() {
-  Serial.print("DEBUG\nWaiting left Button...");
-  do {
-    ButtonLeft.refresh();
-    if(ButtonLeft.onPress()) {
-      break;
-    } else {
-      delay(100);
-    }
-  }
-  while(true);
-  Serial.println("OK");
-  delay(100);
-}
-   
+void Driving() {
+  //Serial.println("Driving: Begin");
 
-void Driving() { // Driving
-  UpdateBusVoltage();
-  ManagePowerSwitch();
-  display.clearDisplay();
-  
-  ViewBattery::setStatus(0);
-  ViewBattery::showBattery();
+  // Initial Background
+  if(lastMode != Mode::Driving) {
+    Serial.println("Driving: First Call");
+    // TODO Reset Screen & Draw Backgroud
+    display.clearDisplay();
+    //BatteryView.setStatus(0);
+    //BatteryView.showBattery();
+    lastMode = Mode::Driving;
+  } else {
+    //Serial.println("Driving: continue");
+  }
+
+      
   // ************** code needed for throttle gauge ******************* //
   /*double _oldThrottleVal = ReadTrottleSensor();
   double _currentThrottleVal;
@@ -395,21 +311,18 @@ void Driving() { // Driving
   int16_t x3, y3;
   double x3tmp, y3tmp;
 */
-  do{
-    ButtonMiddle.refresh();
-    ButtonLeft.refresh();
     if(ButtonMiddle.isLongPress()) {
       Serial.println("ButtonMiddle was pressed - set Mode to ConfirmAge");
-      lastMode = Mode::Driving;
-      currentMode = Mode::ConfirmAge;
-      break;
-    }
-    if(ButtonLeft.isLongPress()) {
-      if(ButtonRight.isLongPress()) {
-        SensorValScreen();
-      }
+      //lastMode = Mode::Driving;
+      currentMode = Mode::ConfirmAge_Instructions;
+      delay(500);
     }
 
+    
+  /*
+  do{ 
+    
+    // TODO detect change of speed
     /*_currentThrottleVal = ReadTrottleSensor();
     if(_currentThrottleVal == _oldThrottleVal) {
     } else {
@@ -447,175 +360,227 @@ void Driving() { // Driving
       _oldThrottleVal = _currentThrottleVal;
     }*/
     
-    ReadTrottleSensor();
-    //Serial.print("Throttle");
-    //Serial.print(TrottleSensorVal);
-    //Serial.print("Percentage");
-    double newMix;
-    double val = TrottleSensorVal;
-    int maxVal = ThrottleMax;
-    newMix = 100*val/maxVal;
-    //Serial.print(newMix);
-    //ViewBattery::setStatus(TrottleSensorVal/ThrottleMax);
-    ViewBattery::setStatus(newMix);
-
-
-    UpdateTrottle();
-  }
-  while(true);
 }
 
-void ConfirmAge() { //Ask for Racer Confirmation
-  switch(lastMode) { // Sobald dieser Teil ausgeführt wird, geht nix mehr
-    case Mode::Driving:
-      break;
-    case Mode::ConfirmAge:
-      break;
-    case Mode::ManageSettings:
-      break;
-    default:
-      break;
+void ConfirmAge_Instructions() {
+  if(currentDriver == Driver::Teen) {
+    // maybe teens want to re-enter this mode, so we use this to set back to "kid"
+    currentDriver = Driver::Kid;
+    exit;
   }
-
-  display.clearDisplay();
-  display.setCursor(0,0);
-  display.write("Rechne aus:");
-  display.display();
-
-  int trial;
-  for(trial = 0; trial < 4; trial++) {
-    display.fillRect(0,20,SCREEN_WIDTH,SCREEN_HEIGHT-20,0);
-    display.setCursor(0,30);
-
-    // Generiere Zufallsrechnung
-    int termType = rand() % 3;
-    int numberA = rand() % 20;
-    int numberB = rand() % 20;
-    String term = "";
-    int solution, userInput;
-
-    switch(termType) {
-      case 0:
-        Serial.print("Add:");
-        Serial.print(numberA);
-        term += numberA;
-        Serial.print(" + ");
-        term += "+";
-        Serial.print(numberB);
-        term += numberB;
-        term += "=";
-        solution = numberA+numberB;
-        Serial.println(solution);
-        break;
-      case 1:
-        Serial.println("Sub");
-        if(numberA<numberB) {
-          Serial.print(numberB);
-          term += numberB;
-          Serial.print(" - ");
-          term += "-";
-          Serial.print(numberA);
-          term += numberA;
-          solution = numberB-numberA;
-        } else {
-          Serial.print(numberA);
-          term += numberA;
-          Serial.print(" - ");
-          term += "-";
-          Serial.print(numberB);
-          term += numberB;
-          term += "=";
-          solution = numberA-numberB;
-        }
-        Serial.print(" = ");
-        Serial.println(solution);
-        break;
-      case 3:
-        Serial.println("Mult");
-        Serial.print(numberA);
-        term += numberA;
-        Serial.print(" * ");
-        term += "*";
-        Serial.print(numberB);
-        term += numberB;
-        term += "=";
-        solution = numberA*numberB;
-        Serial.print(" = ");
-        Serial.println(solution);
-        break;
-      default:
-        break;
-    }
-    display.setTextSize(2);
-    display.print(term);
-    display.display();
-    
-    int cursorX = display.getCursorX();
-    // TODO create INPUT FIELD
-    userInput = 0;
-    do { // Buttoneingaben abfangen, sobald fertig -> break;
-      ButtonLeft.refresh();
-      ButtonRight.refresh();
-      ButtonMiddle.refresh();
-      // userInput einlesen
-      display.setCursor(cursorX,display.getCursorY());
-      display.fillRect(display.getCursorX(),display.getCursorY(),22,16,SSD1306_BLACK);
-      display.print(userInput);
-      display.display();
-      if(ButtonLeft.onPress()) {
-        userInput--;
-        Serial.println("Dec input");
-      }
-      if(ButtonLeft.isLongPress()) {
-        userInput -= 2;
-        Serial.println("Dec input");
-      }
-      if(ButtonRight.onPress()) {
-        userInput++;
-        Serial.println("Incr input");
-      }
-      if(ButtonRight.isLongPress()) {
-        userInput += 2;
-        Serial.println("Dec input");
-      }
-      if(ButtonMiddle.onPress()) {
-        Serial.println("Conf inp");
-        break;
-      }
-      if(ButtonLeft.isLongPress()) {
-        if(ButtonRight.isLongPress()) {
-          if(ButtonMiddle.isLongPress()) {
-            Serial.print("next Menu!");
-            currentMode = Mode::ManageSettings;
-            break;
-          }
-        }
-      }
-    }
-    while(true); // wiederholt Buttoneingaben sonst unendlich
-
-    display.setTextSize(1);
-
-    if(currentMode != Mode::ManageSettings) {
-      if(userInput == solution) {
-        Serial.println("age confirmed");
-        // setze userlimiten neu
-        delay(1000);
-        break; // Schleife abbrechen
-      } else {
-        Serial.println("retry");
-      }
-      Serial.println("go back to drive");
-      currentMode = Mode::Driving;
+  if(lastMode != Mode::ConfirmAge_Instructions) { // init screen
+    lastMode = Mode::ConfirmAge_Instructions;
+    Serial.println("ConfirmAge: Initial call, show instruction then wait keypress");
+    exit;
+  } else {
+    if(ButtonMiddle.onPress()) { // continue on middlepress
+      Serial.println("Continue to Trial1");
+      currentMode = Mode::ConfirmAge_Trial1;
+      exit;
     } else {
-      break;
+      if(ButtonUp.isLongPress()) { // jump to configuration manager with long-up-press
+        Serial.println("Continue to ManagSettings");
+        currentMode = Mode::ManageSettings;
+        exit;
+      }
     }
   }
 }
+
+void ConfirmAge_Trial1() {
+  if(lastMode != Mode::ConfirmAge_Trial1) { // init screen
+    lastMode = Mode::ConfirmAge_Trial1;
+    // Clear Screen
+    Serial.println("Trial 1: Build fix BG");
+    ConfirmAgeAnswer = 0;
+    if(TermHelper::generateTerm()) {
+      //Serial.print("Term was generated");
+    } else {
+      //Serial.print("Could not generate Term");
+    }
+    
+    // Show 1. Term
+    Serial.print("Show term on screen: ");
+    Serial.println(TermHelper::getTerm());
+    Serial.print("Solution: ");
+    Serial.println(TermHelper::getSolution());
+    //TermHelper::generateTerm();
+    exit;
+  } else {
+    if(ButtonUp.onPress()) {
+      ConfirmAgeAnswer ++;
+      Serial.println(ConfirmAgeAnswer);
+    }
+    if(ButtonUp.isLongPress()) {
+      ConfirmAgeAnswer += 2;
+      Serial.println(ConfirmAgeAnswer);
+    }
+    if(ButtonDown.onPress()) {
+      ConfirmAgeAnswer --;
+      Serial.println(ConfirmAgeAnswer);
+    }
+    if(ButtonDown.isLongPress()) {
+      ConfirmAgeAnswer -= 2;
+      Serial.println(ConfirmAgeAnswer);
+    }
+    if(ButtonMiddle.onPress()) {
+      Serial.println("User confirmed input");
+      if(ConfirmAgeAnswer == TermHelper::getSolution()) {
+        Serial.println("Answer correct, change to Teen");
+        // Show Success-Message
+        delay(1000);
+        currentDriver = Driver::Teen;
+        currentMode = Mode::Driving;
+        EEPROM.update(0,ConfirmAgeAnswer); // TODO remove, eeprom test with success
+        EEPROM.commit();
+      } else {
+        Serial.println("Wrong Answer");
+        currentMode = Mode::ConfirmAge_Trial2;
+        exit;
+      }
+    }
+  }
+}
+
+void ConfirmAge_Trial2() {
+  if(lastMode != Mode::ConfirmAge_Trial2) { // init screen
+    lastMode = Mode::ConfirmAge_Trial2;
+    // Clear Screen
+    Serial.println("Trial 2: Build fix BG");
+    ConfirmAgeAnswer = 0;
+    if(TermHelper::generateTerm()) {
+      //Serial.print("Term was generated");
+    } else {
+      //Serial.print("Could not generate Term");
+    }
+    
+    // Show 2. Term
+    Serial.print("Show term on screen: ");
+    Serial.println(TermHelper::getTerm());
+    Serial.print("Solution: ");
+    Serial.println(TermHelper::getSolution());
+    //TermHelper::generateTerm();
+    exit;
+  } else {
+    if(ButtonUp.onPress()) {
+      ConfirmAgeAnswer ++;
+      Serial.println(ConfirmAgeAnswer);
+    }
+    if(ButtonUp.isLongPress()) {
+      ConfirmAgeAnswer += 2;
+      Serial.println(ConfirmAgeAnswer);
+    }
+    if(ButtonDown.onPress()) {
+      ConfirmAgeAnswer --;
+      Serial.println(ConfirmAgeAnswer);
+    }
+    if(ButtonDown.isLongPress()) {
+      ConfirmAgeAnswer -= 2;
+      Serial.println(ConfirmAgeAnswer);
+    }
+    if(ButtonMiddle.onPress()) {
+      Serial.println("User confirmed input");
+      if(ConfirmAgeAnswer == TermHelper::getSolution()) {
+        Serial.println("Answer correct, change to Teen");
+        // Show Success-Message
+        delay(1000);
+        currentDriver = Driver::Teen;
+        currentMode = Mode::Driving;
+      } else {
+        Serial.println("Wrong Answer");
+        currentMode = Mode::ConfirmAge_Trial3;
+        exit;
+      }
+    }
+  }
+}
+
+
+void ConfirmAge_Trial3() {
+  if(lastMode != Mode::ConfirmAge_Trial3) { // init screen
+    lastMode = Mode::ConfirmAge_Trial3;
+    // Clear Screen
+    Serial.println("Trial 3: Build fix BG");
+    ConfirmAgeAnswer = 0;
+    if(TermHelper::generateTerm()) {
+      //Serial.print("Term was generated");
+    } else {
+      //Serial.print("Could not generate Term");
+    }
+    
+    // Show 3. Term
+    Serial.print("Show term on screen: ");
+    Serial.println(TermHelper::getTerm());
+    Serial.print("Solution: ");
+    Serial.println(TermHelper::getSolution());
+    //TermHelper::generateTerm();
+    exit;
+  } else {
+    if(ButtonUp.onPress()) {
+      ConfirmAgeAnswer ++;
+      Serial.println(ConfirmAgeAnswer);
+    }
+    if(ButtonUp.isLongPress()) {
+      ConfirmAgeAnswer += 2;
+      Serial.println(ConfirmAgeAnswer);
+    }
+    if(ButtonDown.onPress()) {
+      ConfirmAgeAnswer --;
+      Serial.println(ConfirmAgeAnswer);
+    }
+    if(ButtonDown.isLongPress()) {
+      ConfirmAgeAnswer -= 2;
+      Serial.println(ConfirmAgeAnswer);
+    }
+    if(ButtonMiddle.onPress()) {
+      Serial.println("User confirmed input");
+      if(ConfirmAgeAnswer == TermHelper::getSolution()) {
+        Serial.println("Answer correct, change to Teen");
+        // Show Success-Message
+        delay(1000);
+        currentDriver = Driver::Teen;
+        currentMode = Mode::Driving;
+      } else {
+        Serial.println("Wrong Answer");
+        currentMode = Mode::Driving;
+        exit;
+      }
+    }
+  }
+}
+
 
 void ManageSettings() {
-int settingId = 10;
+  if(lastMode != Mode::ManageSettings) {
+    // init call
+    // draw background
+    Serial.println("initialize settings manager");
+    lastMode = Mode::ManageSettings;
+  } else {
+    SettingsManager SettingsManager = SettingsManager; // TODO temporär um zu testen obs daran liegt
+    Serial.println("Manage settings:");
+    
+    
+    Serial.print("SettingsSize: ");
+    Serial.print(sizeof SettingsManager);
 
+    Serial.print("Number of Settings found");
+    /*Serial.print("Name of first loaded setting (by func): ");
+    Serial.println(SettingsManager.getName());*/
+    Serial.print("Name of first loaded setting (by variable): ");
+    Serial.println(SettingsManager._settings[0].getName());
+    if(ButtonUp.onPress()) {
+      SettingsManager.nextSetting();
+      exit;
+    }
+    if(ButtonDown.onPress()) {
+      SettingsManager.previousSetting();
+      exit;
+    }
+    delay(5000);
+  }
+int settingId = 10;
+/*
 switch(settingId) { // Sobald dieser Teil ausgeführt wird, geht nix mehr
     case 1:
       break;
@@ -628,7 +593,7 @@ switch(settingId) { // Sobald dieser Teil ausgeführt wird, geht nix mehr
   }
 
   display.clearDisplay();
-  display.setCursor(0,0);
+  display.setCursor(1,0);
   display.print("Einstellung:");
   display.setCursor(84,0);
   display.write(0x11);
@@ -638,57 +603,65 @@ switch(settingId) { // Sobald dieser Teil ausgeführt wird, geht nix mehr
 
   display.setCursor(28,21);
   display.println("Maximales Tempo"); // max 16 zeichen
-  display.setCursor(28,29);
+  display.setCursor(28,31);
   display.println("   - Kind -");
 
-  /*int Tempo_bits[] = {
-   0x7f, 0xf8, 0x03, 0x0f, 0xc3, 0x03, 0xe7, 0x8f, 0x03, 0xb3, 0x2a, 0x03,
-   0xfb, 0x67, 0x03, 0xe9, 0x57, 0x02, 0xfd, 0xf3, 0x02, 0xf4, 0xb3, 0x00,
-   0xfe, 0xf9, 0x01, 0xfe, 0xf9, 0x01, 0xfa, 0x78, 0x01, 0xfe, 0xfc, 0x01,
-   0x74, 0xb8, 0x00, 0x7d, 0xf8, 0x02, 0xf9, 0x7f, 0x02, 0xfb, 0x7f, 0x03,
-   0xf3, 0x3f, 0x03, 0x07, 0x80, 0x03 };
-*/
-  //display.drawXBitmap(30,30, Tempo_bits, 18, 18, 111);
+  //display.drawCircle(14,30,9, SSD1306_WHITE);
 
-  display.drawCircle(14,30,9, SSD1306_WHITE);
+
+
+  //display.drawBitmap(8, 21, Tempo_bits, 18, 18, SSD1306_WHITE, SSD1306_BLACK);
+  // display.drawBitmap(8, 21, Tempo_bits, 18, 18, SSD1306_WHITE); // load icon from icons-folder
+  display.display();
+
   
-   display.setCursor(40,47);
-   display.write(0x1E);
-   display.setCursor(40,53);
-   display.write(0x1F);
+  display.setCursor(40,47);
+  display.write(0x1E);
+  display.setCursor(40,53);
+  display.write(0x1F);
    
-   display.setCursor(48,50);
-   display.print("15 km/h");
-   display.display();
-
-
-  do{
-    Serial.println("Check Button Middle");
-    if(ButtonLeft.onPress()) {
-      Serial.println("ButtonMiddle was pressed - set Mode to Driving");
-      lastMode = Mode::ManageSettings;
-      currentMode = Mode::Driving;
-      break;
-    }
-    delay(1000);
-  }
-  while(true);
+  display.setCursor(48,50);
+  display.print("15 km/h");
+  display.display();
 
   // Config Menu
-
+*/
 }
 
 
 void CheckMode(){
+  //Serial.println("CheckMode Begin");
   switch(currentMode) {
     case Mode::Driving:
       Driving();
       break;
-    case Mode::ConfirmAge:
-      ConfirmAge();
+    case Mode::ConfirmAge_Instructions:
+      ConfirmAge_Instructions();
+      break;
+    case Mode::ConfirmAge_Trial1:
+      ConfirmAge_Trial1();
+      break;
+    case Mode::ConfirmAge_Trial2:
+      ConfirmAge_Trial2();
+      break;
+    case Mode::ConfirmAge_Trial3:
+      ConfirmAge_Trial3();
+      break;
+    case Mode::ConfirmAge_FailedRetry:
+      //
+      break;
+    case Mode::ConfirmAge_FailedExit:
+      //
+      break;
+    case Mode::ConfirmAge_Success:
+      //
       break;
     case Mode::ManageSettings:
       ManageSettings();
       break;
+    case Mode::Statistics:
+      ManageSettings();
+      break;
   };
+  //Serial.println("Check
 }
