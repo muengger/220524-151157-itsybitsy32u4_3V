@@ -16,6 +16,7 @@
 // ---
 
 // --- Includes ---
+#include <Globals.h>
 #include <SPI.h>
 #include <Wire.h>
 #include <Adafruit_GFX.h>
@@ -25,25 +26,24 @@
 #include <gfxfont.h>
 #include <Adafruit_SSD1306.h>
 #include <splash.h>
-#include <FlashAsEEPROM_SAMD.h>
 
 #include <ODriveArduino.h>
 #include <ODriveEnums.h>
 
 #include <HardwareSerial.h>
 #include <ButtonClass.h>
-#include "ThrottleSensor.h"
+#include "ThrottleSensorClass.h"
 #include "TermHelperClass.h"
 #include "ViewBattery.h"
 
-#include "SettingsManager.h"
+#include "SettingsManagerClass.h"
+#include "ScrollClass.h"
 
 // ---
 
 // --- Define ENUMS ---
 enum class Mode { Driving, Statistics, ConfirmAge_Instructions, ConfirmAge_Trial1, ConfirmAge_Trial2, ConfirmAge_Trial3, ConfirmAge_FailedRetry, ConfirmAge_FailedExit, ConfirmAge_Success, ManageSettings };
 enum class Driver { Kid, Teen, Adult };
-enum class PersistedSetting { WheelDiameter };
 
 // -- Initialize Variables
 // Menu
@@ -62,8 +62,8 @@ Button ButtonRight = Button(PinButtonRight);
 Button ButtonMiddle = Button(PinButtonMiddle);
 Button ButtonUp = Button(PinButtonUp);
 Button ButtonDown = Button(PinButtonDown);
-ThrottleSensor ThrottleSensorMain = ThrottleSensor(ThrottleMinValue, ThrottleStopValue, ThrottleStopTolleranceRange, ThrottleMaxValue);
-//SettingsManager SettingsManager = SettingsManager; // original pos for global usage
+ThrottleSensorClass ThrottleSensor = ThrottleSensorClass(ThrottleMinValue, ThrottleStopValue, ThrottleStopTolleranceRange, ThrottleMaxValue);
+SettingsManagerClass SettingsManager = SettingsManagerClass(); // original pos for global usage
 
 //TermHelper TermHelper = TermHelper();
 // ---
@@ -96,34 +96,9 @@ void ConfirmAge_Trial3();
 void showBattery();
 void SensorValScreen();
 
-double getSpeedKmh();
+//double getSpeedKmh();
 
 void serial_flush() ;
-
-/* class CustomSetting { 
-  public:
-    String _Description;
-    int _inputValue;
-    double _factorBasic;
-    
-  public:
-    void CustomSetting(int bindedVariable, String settingDescription, double factor) {
-      _Description = settingDescription;
-      _inputValue = bindedVariable;
-    }
-
-    void IncTrigger(int multiplicator) {
-      _inputValue = _inputValue+(factor*multiplicator)
-      // TODO: check, dass maximalwert nicht überschritten wird
-    }
-
-    void DecTrigger() {
-      _inputValue = _inputValue - (factor*multiplicator)
-      // TODO: check, dass minimalwert nicht unterschritten wird
-    }
-};*/
-
-
 
 /*
 void IconDrawer(int id, uint16_t xPos, uint16_t yPos) {
@@ -138,7 +113,7 @@ void IconDrawer(int id, uint16_t xPos, uint16_t yPos) {
 void SensorValScreen(){
     String sDisplay;
     sDisplay += "\nSpeedPerc.:=";
-    sDisplay += ThrottleSensorMain.getSpeedPromille();
+    sDisplay += ThrottleSensor.getSpeedPromille();
     sDisplay += "\nTorqVal:=";
     sDisplay += Torque;
     sDisplay += "\nBattV:=";
@@ -163,17 +138,6 @@ void setup() {
 
   Serial.begin(9600);
   
-  while (!Serial);
-
-  delay(200);
-
-  //Serial.print(F("\nStart EEPROM_read on ")); Serial.println(BOARD_NAME);
-  //Serial.println(FLASH_STORAGE_SAMD_VERSION);
-
-  Serial.print("EEPROM length: ");
-  Serial.println(EEPROM.length());
-  delay(1000);
-
   digitalWrite(PinHoldPower,HIGH);
   delay(200);
   display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS);
@@ -216,9 +180,6 @@ void loop() {
     
     //UpdateBusVoltage(); //TOFIX currently stops script of running.
 
-    Serial.print("Last time, we saved at 0: ");
-    Serial.println(EEPROM.read(0));
-
 
     ManagePowerSwitch();  
     CheckMode();
@@ -242,18 +203,18 @@ void serial_flush() {
   while (Serial1.available()) Serial1.read();
 }
 
-void ReadTrottleSensor() { // TODO maybe a job for ThrottleSensorMain?
+void ReadTrottleSensor() { // TODO maybe a job for ThrottleSensor?
   int _TrottleSensorVal;
   _TrottleSensorVal = analogRead(PinTrottleSensor);
-  ThrottleSensorMain.setValue(_TrottleSensorVal);
+  ThrottleSensor.setValue(_TrottleSensorVal);
 }
 
 void UpdateTrottle(){ // TODO now we can't change the max torque or the current speed.... should be passed as parameter
   Torque =0;
-  if(ThrottleSensorMain.isForward() == true){
-    Torque  = ThrottleSensorMain.getSpeedPromille()/(double)1000*MaxTorque;
-  }else if (ThrottleSensorMain.isForward() == false){
-    Torque = (ThrottleSensorMain.getSpeedPromille()/(double)1000)-1*MaxTorque;
+  if(ThrottleSensor.isForward() == true){
+    Torque  = ThrottleSensor.getSpeedPromille()/(double)1000*MaxTorque;
+  }else if (ThrottleSensor.isForward() == false){
+    Torque = (ThrottleSensor.getSpeedPromille()/(double)1000)-1*MaxTorque;
   }
   String command = "r axis0.controller.input_torque = ";
   command += Torque;
@@ -293,7 +254,15 @@ void Driving() {
     //BatteryView.setStatus(0);
     //BatteryView.showBattery();
     lastMode = Mode::Driving;
+    if(lastDriver != currentDriver) {
+      // RE READ User SETTINGS
+      //MaxTorque = ??? kalkulieren aus max tempo des aktuellen users, raddurchmesser etc
+      lastDriver = currentDriver;
+    } else {
+      // Still same driver? So nothing to do
+    }
   } else {
+    // We're still in the Driving-Mode
     //Serial.println("Driving: continue");
   }
 
@@ -431,8 +400,6 @@ void ConfirmAge_Trial1() {
         delay(1000);
         currentDriver = Driver::Teen;
         currentMode = Mode::Driving;
-        EEPROM.update(0,ConfirmAgeAnswer); // TODO remove, eeprom test with success
-        EEPROM.commit();
       } else {
         Serial.println("Wrong Answer");
         currentMode = Mode::ConfirmAge_Trial2;
@@ -554,61 +521,105 @@ void ManageSettings() {
   if(lastMode != Mode::ManageSettings) {
     // init call
     // draw background
-    Serial.println("initialize settings manager");
-    lastMode = Mode::ManageSettings;
-  } else {
-    SettingsManager SettingsManager = SettingsManager; // TODO temporär um zu testen obs daran liegt
-    Serial.println("Manage settings:");
-    
-    
-    Serial.print("SettingsSize: ");
-    Serial.print(sizeof SettingsManager);
 
-    Serial.print("Number of Settings found");
-    /*Serial.print("Name of first loaded setting (by func): ");
-    Serial.println(SettingsManager.getName());*/
-    Serial.print("Name of first loaded setting (by variable): ");
-    Serial.println(SettingsManager._settings[0].getName());
-    if(ButtonUp.onPress()) {
+    display.clearDisplay();
+    display.drawFastHLine(1,9,SCREEN_WIDTH-2,SSD1306_WHITE);
+    display.setCursor(1,0);
+    display.print("Einstellung:");
+    display.setCursor(84,0);
+    display.write(0x11);
+    display.setCursor(100,0);
+    display.print("/3");
+    display.write(0x10);
+    display.display();
+
+    lastMode = Mode::ManageSettings;
+    delay(1000);
+  } else {
+    if(SettingsManager.isChanged() == true) {
+      // reset and rebuild dynamic values
+      display.fillRect(91,0,8,7, SSD1306_BLACK);
+      display.fillRect(0,21,128,43, SSD1306_BLACK);
+      
+      // ID Setting (Top Right)
+      display.setCursor(94,0);
+      display.print(SettingsManager.getCurrentSettingId()+1);
+      
+      // ID Middle
+      display.setCursor(28,21);
+      display.println(SettingsManager.getCurrentName()); // max 16 zeichen
+      
+      
+      // Description
+      display.setCursor(28,31);
+      display.println(SettingsManager.getCurrentDescription());
+      
+
+      // Current Value and Suffix and Status
+      display.setCursor(40,50);
+      display.setTextSize(2);
+      if(SettingsManager.getCurrentValueFromMemory() == SettingsManager.getCurrentValueUsed()) {
+        display.write(0x02);
+      } else {
+        display.write(0x01);
+      }
+      display.setTextSize(1);
+      display.print(" ");
+      display.print(SettingsManager.getCurrentValueUsed());
+      display.print(" ");
+      display.print(SettingsManager.getCurrentUnit());
+
+      display.display();
+      SettingsManager.resetChangedFlag();
+      
+    }
+
+    
+    Serial.print("SettingsManager at Setting: ");
+    Serial.println(SettingsManager.getCurrentName());
+    Serial.print("Current Value at: ");
+    Serial.println(SettingsManager.getCurrentValueUsed());
+    if(ButtonRight.onPress()) {
       SettingsManager.nextSetting();
+      //Serial.println("Pressed up");
+      exit;
+    }
+    if(ButtonLeft.onPress()) {
+      SettingsManager.previousSetting();
+      //Serial.println("Pressed down");
+      exit;
+    }
+    if(ButtonUp.onPress()) {
+      SettingsManager.increaseCurrentValue();
+      //Serial.println("Pressed up");
+      exit;
+    }
+    if(ButtonUp.isLongPress()) {
+      SettingsManager.increaseCurrentValue(2);
+      //Serial.println("Pressed up");
       exit;
     }
     if(ButtonDown.onPress()) {
-      SettingsManager.previousSetting();
+      SettingsManager.decreaseCurrentValue();
+      //Serial.println("Pressed down");
       exit;
     }
-    delay(5000);
+    if(ButtonDown.isLongPress()) {
+      SettingsManager.decreaseCurrentValue(2);
+      //Serial.println("Pressed down");
+      exit;
+    }
+    if(ButtonMiddle.onRelease()) {
+      SettingsManager.saveCurrentValueToMemory();
+      //Serial.println("should persist");
+    }
+    if(ButtonMiddle.isLongPress()) {
+      currentMode=Mode::Driving;
+    }
   }
-int settingId = 10;
+
 /*
-switch(settingId) { // Sobald dieser Teil ausgeführt wird, geht nix mehr
-    case 1:
-      break;
-    case 2:
-      break;
-    case 3:
-      break;
-    default:
-      break;
-  }
-
-  display.clearDisplay();
-  display.setCursor(1,0);
-  display.print("Einstellung:");
-  display.setCursor(84,0);
-  display.write(0x11);
-  display.print("10/14");
-  display.write(0x10);
-  display.drawFastHLine(1,9,SCREEN_WIDTH-2,SSD1306_WHITE);
-
-  display.setCursor(28,21);
-  display.println("Maximales Tempo"); // max 16 zeichen
-  display.setCursor(28,31);
-  display.println("   - Kind -");
-
   //display.drawCircle(14,30,9, SSD1306_WHITE);
-
-
 
   //display.drawBitmap(8, 21, Tempo_bits, 18, 18, SSD1306_WHITE, SSD1306_BLACK);
   // display.drawBitmap(8, 21, Tempo_bits, 18, 18, SSD1306_WHITE); // load icon from icons-folder
@@ -619,12 +630,7 @@ switch(settingId) { // Sobald dieser Teil ausgeführt wird, geht nix mehr
   display.write(0x1E);
   display.setCursor(40,53);
   display.write(0x1F);
-   
-  display.setCursor(48,50);
-  display.print("15 km/h");
-  display.display();
-
-  // Config Menu
+  
 */
 }
 
@@ -660,7 +666,7 @@ void CheckMode(){
       ManageSettings();
       break;
     case Mode::Statistics:
-      ManageSettings();
+      //
       break;
   };
   //Serial.println("Check
