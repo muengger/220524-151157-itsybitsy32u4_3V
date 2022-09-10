@@ -31,10 +31,10 @@ SettingsManagerClass::SettingsManagerClass() {
 	BatMaxVoltage.setValueUsed(42);
 
 	Setting BatMinVoltage = Setting("Min. Spannung", "Ab dieser Spannung wird abgeschalten - ", 1, "V");
-	BatMaxVoltage.setValueUsed(33);
+	BatMinVoltage.setValueUsed(33);
 
 	Setting BatWarnPercentage = Setting("Bat. Warnung", "Ist die Spannung nur noch so gering, wird gewarnt - ", 1, "%");
-	BatMaxVoltage.setValueUsed(5);
+	BatWarnPercentage.setValueUsed(5);
 
 	Setting ThrootleForw = Setting("Max. nach vorn", "Maximalwert des Gasreglers - ", 1, "");
 	ThrootleForw.setValueUsed(955);
@@ -66,7 +66,9 @@ SettingsManagerClass::SettingsManagerClass() {
 	for(int i = 0; i <= 10; i++) {
 		PersistedSetting _set = EnumOfIndex(i);
 		int valueMemory = getSettingValueFromMemory(_set);
-		_settings[i].setValueUsed(valueMemory);
+		if(valueMemory != 255) {
+			_settings[i].setValueUsed(valueMemory);
+		}
 	}
 
 	CurrentSetting = EnumOfIndex(0);
