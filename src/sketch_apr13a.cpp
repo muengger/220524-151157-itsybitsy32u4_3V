@@ -64,6 +64,7 @@ Button ButtonUp = Button(PinButtonUp);
 Button ButtonDown = Button(PinButtonDown);
 ThrottleSensorClass ThrottleSensor = ThrottleSensorClass(ThrottleMinValue, ThrottleStopValue, ThrottleStopTolleranceRange, ThrottleMaxValue);
 SettingsManagerClass SettingsManager = SettingsManagerClass(); // original pos for global usage
+ScrollClass ScrollingText;
 
 //TermHelper TermHelper = TermHelper();
 // ---
@@ -139,7 +140,6 @@ void setup() {
   Serial.begin(9600);
   
   digitalWrite(PinHoldPower,HIGH);
-  delay(200);
   display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS);
   display.display();
   display.clearDisplay();
@@ -256,6 +256,20 @@ void Driving() {
     lastMode = Mode::Driving;
     if(lastDriver != currentDriver) {
       // RE READ User SETTINGS
+      switch (currentDriver)
+      {
+      case Driver::Kid:
+        //MaxTorque = SettingsManager.getValueUsedOfSetting()
+        break;
+      case Driver::Teen:
+        /* code */
+        break;
+      case Driver::Adult:
+        /* code */
+        break;
+      default:
+        break;
+      }
       //MaxTorque = ??? kalkulieren aus max tempo des aktuellen users, raddurchmesser etc
       lastDriver = currentDriver;
     } else {
@@ -284,7 +298,6 @@ void Driving() {
       Serial.println("ButtonMiddle was pressed - set Mode to ConfirmAge");
       //lastMode = Mode::Driving;
       currentMode = Mode::ConfirmAge_Instructions;
-      delay(500);
     }
 
     
@@ -462,7 +475,6 @@ void ConfirmAge_Trial2() {
   }
 }
 
-
 void ConfirmAge_Trial3() {
   if(lastMode != Mode::ConfirmAge_Trial3) { // init screen
     lastMode = Mode::ConfirmAge_Trial3;
@@ -516,7 +528,6 @@ void ConfirmAge_Trial3() {
   }
 }
 
-
 void ManageSettings() {
   if(lastMode != Mode::ManageSettings) {
     // init call
@@ -526,36 +537,45 @@ void ManageSettings() {
     display.drawFastHLine(1,9,SCREEN_WIDTH-2,SSD1306_WHITE);
     display.setCursor(1,0);
     display.print("Einstellung:");
-    display.setCursor(84,0);
+    display.setCursor(84,0); // <-
     display.write(0x11);
-    display.setCursor(100,0);
-    display.print("/3");
-    display.write(0x10);
+    display.setCursor(104,0);
+    display.print("/12");
+    display.write(0x10); // ->
     display.display();
+    delay(300);
 
     lastMode = Mode::ManageSettings;
-    delay(1000);
   } else {
     if(SettingsManager.isChanged() == true) {
+      // DEBUG
+      //Serial.print("SettingsManager at Setting: ");
+      //Serial.println(SettingsManager.getCurrentName());
+      //Serial.print("Current Value at: ");
+      //Serial.println(SettingsManager.getCurrentValueUsed());
+    
       // reset and rebuild dynamic values
-      display.fillRect(91,0,8,7, SSD1306_BLACK);
+
+      // index of setting
+      display.fillRect(90,0,14,7, SSD1306_BLACK);
+
+      // part below (name, desc. values etc.)
       display.fillRect(0,21,128,43, SSD1306_BLACK);
       
       // ID Setting (Top Right)
-      display.setCursor(94,0);
+      display.setCursor(91,0);
       display.print(SettingsManager.getCurrentSettingId()+1);
       
-      // ID Middle
-      display.setCursor(28,21);
+      // ID Name at Middle
+      display.setCursor(9,21);
       display.println(SettingsManager.getCurrentName()); // max 16 zeichen
-      
+      display.display();
       
       // Description
-      display.setCursor(28,31);
-      display.println(SettingsManager.getCurrentDescription());
+      ScrollingText = ScrollClass(display, SettingsManager.getCurrentDescription(),9,31,18);
+      //ScrollingText.SetDelay(350);
       
-
-      // Current Value and Suffix and Status
+      // a smiley should indicate if value is saved or not
       display.setCursor(40,50);
       display.setTextSize(2);
       if(SettingsManager.getCurrentValueFromMemory() == SettingsManager.getCurrentValueUsed()) {
@@ -563,22 +583,21 @@ void ManageSettings() {
       } else {
         display.write(0x01);
       }
+
+      // show value and unit
       display.setTextSize(1);
       display.print(" ");
       display.print(SettingsManager.getCurrentValueUsed());
       display.print(" ");
       display.print(SettingsManager.getCurrentUnit());
-
       display.display();
       SettingsManager.resetChangedFlag();
       
+    } else {
+      ScrollingText.Refresh();
     }
 
     
-    Serial.print("SettingsManager at Setting: ");
-    Serial.println(SettingsManager.getCurrentName());
-    Serial.print("Current Value at: ");
-    Serial.println(SettingsManager.getCurrentValueUsed());
     if(ButtonRight.onPress()) {
       SettingsManager.nextSetting();
       //Serial.println("Pressed up");
@@ -617,21 +636,6 @@ void ManageSettings() {
       currentMode=Mode::Driving;
     }
   }
-
-/*
-  //display.drawCircle(14,30,9, SSD1306_WHITE);
-
-  //display.drawBitmap(8, 21, Tempo_bits, 18, 18, SSD1306_WHITE, SSD1306_BLACK);
-  // display.drawBitmap(8, 21, Tempo_bits, 18, 18, SSD1306_WHITE); // load icon from icons-folder
-  display.display();
-
-  
-  display.setCursor(40,47);
-  display.write(0x1E);
-  display.setCursor(40,53);
-  display.write(0x1F);
-  
-*/
 }
 
 

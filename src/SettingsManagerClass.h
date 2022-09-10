@@ -52,11 +52,11 @@ class SettingsManagerClass {
 		void decreaseCurrentValue(int factor);
 		void decreaseCurrentValue();
 
-		Setting _settings[3];
+		Setting _settings[12];
 
 	private:
 		PersistedSetting CurrentSetting;
-		bool isChangedFlag = false;
+		bool isChangedFlag = true;
 
 		PersistedSetting EnumOfIndex(int i);
 };

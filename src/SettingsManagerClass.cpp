@@ -3,33 +3,73 @@
 #include "Globals.h"
 #include "FlashAsEEPROM_SAMD.h"
 
-Setting _settings[3];
+Setting _settings[12];
 
 // Constructor
 SettingsManagerClass::SettingsManagerClass() {
 
-	// Define Changeable Settings
 	CurrentSetting = PersistedSetting::WheelDiameter; 
-	Setting Diameter = Setting("Raddurchmesser", "Notw. f. Kalk.", 1, "mm");
-	Diameter.setValueUsed(20); // set default value if nothing is persisted
-	Setting MaxSpeedKid = Setting("Max. Tempo", "- Kind -", 1, "km/h");
-	MaxSpeedKid.setValueUsed(15);
-	Setting MaxSpeedTeen = Setting("Max. Tempo", "- Teenie -", 1, "km/h" );
-	MaxSpeedTeen.setValueUsed(25);
-	
 
+	// Define Changeable Settings
+	
+	Setting Diameter = Setting("Raddurchmesser", "Notwendig fur Temporbererchnung - ", 1, "mm");
+	Diameter.setValueUsed(20); // set default value if nothing is persisted
+
+	Setting MaxSpeedKid = Setting("Max. Tempo", "Kindergarten", 1, "km/h");
+	MaxSpeedKid.setValueUsed(15);
+
+	Setting MaxTorqueKid = Setting("Max. Drehmoment", "Kindergarten", 1, "M");
+	MaxTorqueKid.setValueUsed(1.5);
+
+	Setting MaxSpeedTeen = Setting("Max. Tempo", "Schulkind", 1, "km/h" );
+	MaxSpeedTeen.setValueUsed(25);
+
+	Setting MaxTorqueTeen = Setting("Max. Drehmoment", "Schulkind", 1, "M");
+	MaxTorqueTeen.setValueUsed(3);
+
+	Setting BatMaxVoltage = Setting("Max. Spannung", "Die Batterie ist zu 100% geladen - ", 1, "V");
+	BatMaxVoltage.setValueUsed(42);
+
+	Setting BatMinVoltage = Setting("Min. Spannung", "Ab dieser Spannung wird abgeschalten - ", 1, "V");
+	BatMaxVoltage.setValueUsed(33);
+
+	Setting BatWarnPercentage = Setting("Bat. Warnung", "Ist die Spannung nur noch so gering, wird gewarnt - ", 1, "%");
+	BatMaxVoltage.setValueUsed(5);
+
+	Setting ThrootleForw = Setting("Max. nach vorn", "Maximalwert des Gasreglers - ", 1, "");
+	ThrootleForw.setValueUsed(955);
+
+	Setting ThrootleBackw = Setting("Max. nach hinten", "Minimalwert des Gasreglers - ", 1, "");
+	ThrootleBackw.setValueUsed(0);
+
+	Setting ThrootleStop = Setting("Stillstand", "Wert wenn Gasregler im Ruhezustand - ", 1, "");
+	ThrootleStop.setValueUsed(340);
+
+	Setting ThrootleStopTollerance = Setting("Tolleranz", "+/- Bereich um den Stillstand - ", 1, "+/-");
+	ThrootleStopTollerance.setValueUsed(10);
 
 	// Index-IDs of following Array is taken from Enum class "PersistedSettings"
-	_settings[0] = Diameter; // 0 should be replaced with (int)PersistedSetting::WheelDiameter
-	_settings[1] = MaxSpeedKid; // 1 should be replaced with (int)PersistedSetting::MaxSpeedKid
-	_settings[2] = MaxSpeedTeen; // 2 should be replaced with PersistedSetting::MaxSpeedTeen
+	_settings[0] = Diameter; // index should be replaced with (int)PersistedSetting::WheelDiameter
+	_settings[1] = MaxSpeedKid;
+	_settings[2] = MaxSpeedTeen;
+	_settings[3] = MaxTorqueKid;
+	_settings[4] = MaxTorqueTeen;
+	_settings[5] = BatMinVoltage;
+	_settings[6] = BatMaxVoltage;
+	_settings[7] = BatWarnPercentage;
+	_settings[8] = ThrootleForw;
+	_settings[9] = ThrootleBackw;
+	_settings[10] = ThrootleStop;
+	_settings[11] = ThrootleStopTollerance;
 	//Read all values from Memory
-	//int i = 0;
-	for(int i = 0; i <= 2; i++) {
+
+	for(int i = 0; i <= 10; i++) {
 		PersistedSetting _set = EnumOfIndex(i);
 		int valueMemory = getSettingValueFromMemory(_set);
 		_settings[i].setValueUsed(valueMemory);
 	}
+
+	CurrentSetting = EnumOfIndex(0);
 }
 
 // Destructor
@@ -87,7 +127,7 @@ int getValueUsedOfSetting(PersistedSetting _selectedSetting) {
 }
 
 void SettingsManagerClass::nextSetting() {
-	if((int)CurrentSetting == 2) {
+	if((int)CurrentSetting == 11) {
 		CurrentSetting = SettingsManagerClass::EnumOfIndex(0);
 		//Serial.println("Set Pos back to 0");
 	} else {
@@ -96,19 +136,17 @@ void SettingsManagerClass::nextSetting() {
 		//Serial.println(CurrentSetting);
 	}
 	isChangedFlag = true;
-	delay(1000);
 }
 
 void SettingsManagerClass::previousSetting() {
 	if((int)CurrentSetting == 0) {
-		CurrentSetting = EnumOfIndex(2);
+		CurrentSetting = EnumOfIndex(11);
 		//Serial.println("Set Pos back to 0");
 	} else {
 		CurrentSetting = EnumOfIndex((int)CurrentSetting-1);
 		//Serial.print("Dec Pos to ");
 		//Serial.println(CurrentSetting);
 	}
-	//delay(1000);
 	isChangedFlag = true;
 }
 
