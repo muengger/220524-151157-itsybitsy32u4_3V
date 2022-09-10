@@ -151,10 +151,10 @@ void setup() {
   display.display();
   delay(1500);
 
-  //odrive_serial.begin(57600);
-  //Serial1.setTimeout(4);
-  //requested_state = AXIS_STATE_CLOSED_LOOP_CONTROL;
-  //odrive.runState(motornum, requested_state, false /*don't wait*/); // comment as long drive is not connected!
+  odrive_serial.begin(57600);
+  Serial1.setTimeout(4);
+  requested_state = AXIS_STATE_CLOSED_LOOP_CONTROL;
+  odrive.runState(motornum, requested_state, false /*don't wait*/); // comment as long drive is not connected!
   //display.clearDisplay();
   //display.display();
 }
@@ -176,6 +176,7 @@ void loop() {
     ButtonRight.refresh();
     ButtonMiddle.refresh();
     ReadTrottleSensor();
+    UpdateTrottle();
     // ---
     
     //UpdateBusVoltage(); //TOFIX currently stops script of running.
@@ -220,6 +221,7 @@ void UpdateTrottle(){ // TODO now we can't change the max torque or the current 
   command += Torque;
   command += "\n";
   Serial1.write(command.c_str());
+  Serial.println(command);
 }
 
 void UpdateBusVoltage(){
@@ -251,8 +253,9 @@ void Driving() {
     Serial.println("Driving: First Call");
     // TODO Reset Screen & Draw Backgroud
     display.clearDisplay();
-    //BatteryView.setStatus(0);
-    //BatteryView.showBattery();
+    BatteryView.setStatus(0);
+    BatteryView.showBattery();
+    display.display();
     lastMode = Mode::Driving;
     if(lastDriver != currentDriver) {
       // RE READ User SETTINGS
@@ -277,12 +280,20 @@ void Driving() {
     }
   } else {
     // We're still in the Driving-Mode
-    //Serial.println("Driving: continue");
+    Serial.println("Driving: continue");
+    // TODO implement battery thing;
+    if(ButtonMiddle.isLongPress()) {
+      Serial.println("ButtonMiddle was pressed - set Mode to ConfirmAge");
+      //lastMode = Mode::Driving;
+      currentMode = Mode::ConfirmAge_Instructions;
+    }
+
+
   }
 
-      
+/*
   // ************** code needed for throttle gauge ******************* //
-  /*double _oldThrottleVal = ReadTrottleSensor();
+  double _oldThrottleVal = ReadTrottleSensor();
   double _currentThrottleVal;
   double speedInPercent;
 
@@ -293,14 +304,8 @@ void Driving() {
   int16_t y2 = 60;
   int16_t x3, y3;
   double x3tmp, y3tmp;
-*/
-    if(ButtonMiddle.isLongPress()) {
-      Serial.println("ButtonMiddle was pressed - set Mode to ConfirmAge");
-      //lastMode = Mode::Driving;
-      currentMode = Mode::ConfirmAge_Instructions;
-    }
+  */
 
-    
   /*
   do{ 
     
