@@ -6,6 +6,8 @@ class Setting {
 		Setting();
 		Setting(String _name, String _description, int _step, String _setUnit);
 
+		// TODO accept parameter for maximal value -> so we can calc. the memory-size needed to store big values
+
 		// Destructor
 		~Setting();
 		
