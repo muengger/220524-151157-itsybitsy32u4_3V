@@ -2,29 +2,38 @@
 
 class Setting {
 	public:
+		// Constructor
 		Setting();
 		Setting(String _name, String _description, int _step, String _setUnit);
+
+		// TODO accept parameter for maximal value -> so we can calc. the memory-size needed to store big values
+
+		// Destructor
 		~Setting();
 		
-		/*void BindVariable(int _integer);*/
-
+		// Returns the Name of the Setting
 		String getName();
-		
-		/*
+
+		// Returns the Description of the Setting
 		String getDescription();
+
+		// Returns the Step to In- or Decrease
 		int getStep();
+
+		// Returns the Suffix for the Value
 		String getUnit();
+		
+		// Sets a value to be used for this Setting
+		void setValueUsed(int _valueUsed);
 
-		int getCurrentValue();
-		//void setIcon(18x18Icon icon_bytes);*/
-
-	//private:
+		// Gets the value used for this Setting
+		int getValueUsed();
+		
+	private:
 		String Name;
 		String Description;
 		int Step;
 		String Unit;
-		
-		/*
-		int VarInteger;
-		int EEPROMAddress;*/
+		int ValueUsed;
+
 };

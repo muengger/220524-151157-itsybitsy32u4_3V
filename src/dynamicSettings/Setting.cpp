@@ -1,37 +1,23 @@
 #include "Setting.h"
 
-String Name="NameInit";
-
 Setting::Setting() {
-	//
+	// do nothing
 };
 
 Setting::Setting(String _name, String _description, int _step, String _setUnit) {
-	Name = "nameOfAllSettings";
+	Name = _name;
 	Description = _description;
 	Step = _step;
 	Unit = _setUnit;
-	Serial.print("Saved Setting with Name: ");
-	Serial.println(Name);
 }
 
 Setting::~Setting() {
-	// do something
+	// do nothing
 }
 
-/*int Setting::getCurrentValue() {
-	return VarInteger;
-}
-
-void Setting::BindVariable(int _integer) {
-	VarInteger = _integer;
-}
-
-*/
 String Setting::getName() {
 	return Name;
 }
-/*
 
 String Setting::getDescription() {
 	return Description;
@@ -43,4 +29,12 @@ int Setting::getStep() {
 
 String Setting::getUnit() {
 	return Unit;
-}*/
+}
+
+void Setting::setValueUsed(int _valueUsed) {
+	ValueUsed = _valueUsed;
+}
+
+int Setting::getValueUsed() {
+	return ValueUsed;
+}
