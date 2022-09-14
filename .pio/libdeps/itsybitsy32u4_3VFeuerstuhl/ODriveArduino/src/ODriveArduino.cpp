@@ -7,7 +7,7 @@ template<class T> inline Print& operator <<(Print& obj, T arg) { obj.print(arg);
 template<>        inline Print& operator <<(Print& obj, float arg) { obj.print(arg, 4); return obj; }
 
 ODriveArduino::ODriveArduino(Stream& serial): serial_(serial) {
-
+    //this->serial_ = serial;
 }
 
 void ODriveArduino::setPosition(int motor_number, float position, float velocity_feedforward, float torque_feedforward) {

@@ -72,7 +72,7 @@ Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 ViewBattery BatteryView(display);
 HardwareSerial& odrive_serial = Serial1;
 // ODrive object
-ODriveArduino odrive(odrive_serial);
+ODriveArduino odrive(Serial1);
 
 
 // Printing with stream operator helper functions

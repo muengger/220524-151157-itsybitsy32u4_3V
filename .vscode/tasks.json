@@ -13,7 +13,7 @@
 		{
 			"type": "cppbuild",
 			"label": "C/C++: arm-none-eabi-gcc.exe Aktive Datei kompilieren",
-			"command": "C:/Users/BeatStieger/.platformio/packages/toolchain-gccarmnoneeabi/bin/arm-none-eabi-gcc.exe",
+			"command": "C:/Users/sct/.platformio/packages/toolchain-gccarmnoneeabi/bin/arm-none-eabi-gcc.exe",
 			"args": [
 				"-fdiagnostics-color=always",
 				"-g",
@@ -27,13 +27,13 @@
 				""
 			],
 			"options": {
-				"cwd": "C:/Users/BeatStieger/.platformio/packages/toolchain-gccarmnoneeabi/bin"
+				"cwd": "C:/Users/sct/.platformio/packages/toolchain-gccarmnoneeabi/bin"
 			},
 			"problemMatcher": [
 				"$gcc"
 			],
 			"group": "build",
-			"detail": "Compiler: C:/Users/BeatStieger/.platformio/packages/toolchain-gccarmnoneeabi/bin/arm-none-eabi-gcc.exe"
+			"detail": "Compiler: C:/Users/sct/.platformio/packages/toolchain-gccarmnoneeabi/bin/arm-none-eabi-gcc.exe"
 		}
 	]
 }
